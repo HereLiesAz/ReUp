@@ -1,15 +1,21 @@
+// hereliesaz/reup/ReUp-9db2805a9ede9350d55e55d72acf9c1535bb70f4/app/src/main/kotlin/com/hereliesaz/reup/SpiralConfig.kt
+
 package com.hereliesaz.reup
 
 import androidx.compose.ui.graphics.Color
 
 /**
  * The geometrical constants of your configured despair.
- * We use bitmasks for targets and float vectors for severity ranges.
+ * Now expanded to govern the neural network's sensitivity threshold.
  */
 object SpiralConfig {
 
     const val PREFS_NAME = "ReUpSurveillancePrefs"
     const val KEY_FILTER_MASK = "surveillance_filter_mask"
+    
+    // Adjustable Paranoia: The sensitivity of the NLClassifier (0.0 to 1.0)
+    const val KEY_SENSITIVITY = "surveillance_sensitivity"
+    const val DEFAULT_SENSITIVITY = 0.5f
 
     // Dimension A: Focus (Negativity toward what) - First byte (bits 0-7)
     const val FOCUS_SELF = 1 shl 0   // 00000000 00000001 (Decimal 1)
@@ -26,7 +32,7 @@ object SpiralConfig {
     // Default configuration: Total surveillance. Intervene on ALL toxicity vectors.
     const val DEFAULT_MASK = MASK_FOCUS or MASK_TYPE
 
-    // --- SEVERITY ARCHITECTURE (NEW) ---
+    // --- SEVERITY ARCHITECTURE ---
     // Severity scores ($S_s$) are probabilistic ranges [0.0 - 1.0].
 
     // MILD severity (0.00 - 0.39): Represented by the icon's harsh golden rays.
@@ -53,7 +59,7 @@ object SpiralConfig {
      */
     fun toggleFlag(currentMask: Int, flag: Int): Int {
         return if (isEnabled(currentMask, flag)) {
-            currentMask and flag.inv() // Turn off surveillance for this vector via bitwise NOT.
+            currentMask and flag.inv() // Turn off surveillance via bitwise NOT.
         } else {
             currentMask or flag // Turn on surveillance via bitwise OR.
         }
