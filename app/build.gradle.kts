@@ -48,6 +48,11 @@ android {
     androidResources {
         noCompress.add("tflite")
     }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    buildToolsVersion = "36.1.0"
 }
 
 androidComponents {
@@ -86,15 +91,15 @@ tasks.named("preBuild") {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.activity:activity-compose:1.8.2")
-    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+    implementation("androidx.core:core-ktx:1.18.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation(platform("androidx.compose:compose-bom:2026.03.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
     
-    implementation("com.google.ai.edge.litert:litert:2.1.0")
+    implementation("com.google.ai.edge.litert:litert:2.1.3")
 
     implementation("org.tensorflow:tensorflow-lite-task-text:0.4.4") {
         exclude(group = "org.tensorflow", module = "tensorflow-lite")
