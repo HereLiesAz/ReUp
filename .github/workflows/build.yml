@@ -50,6 +50,18 @@ jobs:
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
           echo "REVISION_C=$c" >> $GITHUB_ENV
           
+          # Generate Changelog since the last tag (if exists)
+          LAST_TAG=$(git tag --sort=-v:refname | grep -v "$TAG_NAME" | head -n 1 || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            echo "Generating changelog between $LAST_TAG and HEAD"
+            echo "### Changelog (since $LAST_TAG)" > changelog.md
+            git log ${LAST_TAG}..HEAD --oneline --pretty=format:"* %s (%h)" >> changelog.md
+          else
+            echo "Generating initial changelog"
+            echo "### Initial Build" > changelog.md
+            git log --oneline --pretty=format:"* %s (%h)" >> changelog.md
+          fi
+          
           echo "Calculated Vector: $VERSION_NAME"
 
       - name: Compile the Panopticon
@@ -62,9 +74,4 @@ jobs:
           name: "ReUp ${{ env.TAG_NAME }}"
           prerelease: true
           files: app/build/outputs/apk/debug/*.apk
-          body: |
-            An automated compilation of your psychological state.
-            
-            **Vector:** `${{ env.VERSION_NAME }}`
-            **Total Builds ($d$):** `${{ env.VERSION_CODE }}`
-            **Revisions since structural shift ($c$):** `${{ env.REVISION_C }}`
+          body_path: changelog.md
