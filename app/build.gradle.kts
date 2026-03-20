@@ -11,12 +11,12 @@ val envVersionCode = System.getenv("VERSION_CODE")?.toInt() ?: 1
 
 android {
     namespace = "com.hereliesaz.reup"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.hereliesaz.reup"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = envVersionCode
         versionName = envVersionName
     }
