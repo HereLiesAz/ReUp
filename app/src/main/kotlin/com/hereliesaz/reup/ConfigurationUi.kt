@@ -16,13 +16,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.reup.ui.theme.*
 import com.hereliesaz.reup.SpiralConfig as Config
 
 /**
  * The command center for your surveillance.
- * Equipped with Adjustable Paranoia and the Jagged Line Chart of Relentless Progression.
+ * The illusion of choice has been corrected.
  */
 @Composable
 fun SurveillanceConfigurationScreen(context: Context) {
@@ -87,6 +88,14 @@ fun SurveillanceConfigurationScreen(context: Context) {
         ConfigCheckbox("OTHERS", Config.isEnabled(currentMask, Config.FOCUS_OTHERS), checkColors) { updateMask(Config.FOCUS_OTHERS) }
         ConfigCheckbox("WORLD", Config.isEnabled(currentMask, Config.FOCUS_WORLD), checkColors) { updateMask(Config.FOCUS_WORLD) }
 
+        Spacer(modifier = Modifier.height(24.dp))
+        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+
+        SectionHeader("TYPE VECTORS")
+        ConfigCheckbox("DESPAIR", Config.isEnabled(currentMask, Config.TYPE_DESPAIR), checkColors) { updateMask(Config.TYPE_DESPAIR) }
+        ConfigCheckbox("WORTHLESS", Config.isEnabled(currentMask, Config.TYPE_WORTHLESS), checkColors) { updateMask(Config.TYPE_WORTHLESS) }
+        ConfigCheckbox("ANGER", Config.isEnabled(currentMask, Config.TYPE_ANGER), checkColors) { updateMask(Config.TYPE_ANGER) }
+
         Spacer(modifier = Modifier.height(64.dp))
     }
 }
@@ -126,7 +135,6 @@ fun JaggedLineChart(data: List<DailyDistortion>) {
 
             drawPath(path = path, color = RayGold, style = Stroke(width = 4f))
             
-            // Draw data points
             counts.forEachIndexed { index, count ->
                 val x = index * spacing
                 val y = height - (count / maxCount * height)
