@@ -14,7 +14,7 @@ jobs:
       - name: Checkout the Void
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # We require the entire historical weight of your commits to calculate 'c'
+          fetch-depth: 0
 
       - name: Establish Epistemology
         uses: actions/setup-java@v4
@@ -28,18 +28,14 @@ jobs:
       - name: Calculate Entropy (a.b.c.d)
         id: version
         run: |
-          # Extract a and b from the physical anchor
           source version.properties
           a=$MAJOR
           b=$MINOR
           
-          # d is the absolute truth of GitHub's internal counting mechanism. It never resets.
           d=${{ github.run_number }}
           
           TAG_NAME="v$a.$b"
           
-          # If the tag exists remotely, calculate c (commits since the tag). 
-          # If it does not exist, c is 0. The tag will be forged during the release step.
           if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
             git fetch --tags
             c=$(git rev-list ${TAG_NAME}..HEAD --count)
@@ -49,7 +45,6 @@ jobs:
           
           VERSION_NAME="$a.$b.$c.$d"
           
-          # Inject the math into the workflow environment
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
           echo "VERSION_CODE=$d" >> $GITHUB_ENV
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -65,7 +60,8 @@ jobs:
         with:
           tag_name: ${{ env.TAG_NAME }}
           name: "ReUp ${{ env.TAG_NAME }}"
-          files: app/build/outputs/apk/debug/app-debug.apk
+          # The machine now seeks the exact physical manifestation of your vector.
+          files: app/build/outputs/apk/debug/ReUp-debug-${{ env.VERSION_NAME }}.apk
           body: |
             An automated compilation of your psychological state.
             
