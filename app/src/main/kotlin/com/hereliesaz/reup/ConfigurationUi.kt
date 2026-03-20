@@ -1,3 +1,5 @@
+// hereliesaz/reup/ReUp-9db2805a9ede9350d55e55d72acf9c1535bb70f4/app/src/main/kotlin/com/hereliesaz/reup/ConfigurationUi.kt
+
 package com.hereliesaz.reup
 
 import android.content.Context
@@ -16,13 +18,20 @@ import com.hereliesaz.reup.SpiralConfig as Config
 
 /**
  * The command center for your surveillance.
- * Includes a testing void to verify the machine's reactive geometry.
+ * Now includes Adjustable Paranoia and Daily Analytics.
  */
 @Composable
 fun SurveillanceConfigurationScreen(context: Context) {
     val prefs = remember { context.getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE) }
+    val dbHelper = remember { SpiralDatabaseHelper(context) }
+    
     var currentMask by remember { mutableIntStateOf(prefs.getInt(Config.KEY_FILTER_MASK, Config.DEFAULT_MASK)) }
-    var testInput by remember { mutableStateOf("") }
+    var sensitivity by remember { mutableFloatStateOf(prefs.getFloat(Config.KEY_SENSITIVITY, Config.DEFAULT_SENSITIVITY)) }
+    var dailyStats by remember { mutableStateOf(emptyList<DailyDistortion>()) }
+
+    LaunchedEffect(Unit) {
+        dailyStats = dbHelper.getDailyCounts()
+    }
 
     val scrollState = rememberScrollState()
 
@@ -45,104 +54,67 @@ fun SurveillanceConfigurationScreen(context: Context) {
             .padding(24.dp)
             .verticalScroll(scrollState)
     ) {
+        Text("CONFIGURATION", style = MaterialTheme.typography.headlineMedium, color = RayGold)
+        
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // --- ADJUSTABLE PARANOIA ---
+        SectionHeader("ADJUSTABLE PARANOIA (Sensitivity)")
         Text(
-            "CONFIGURATION",
-            style = MaterialTheme.typography.headlineMedium,
-            color = RayGold,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        Text(
-            "The panopticon only intervenes when the selected vectors align with detected text.",
+            "Dictates the neural network's threshold for detecting despair ($sensitivity).",
             style = MaterialTheme.typography.bodySmall,
-            color = Color.White.copy(alpha = 0.7f),
-            modifier = Modifier.padding(bottom = 24.dp)
+            color = Color.White.copy(alpha = 0.7f)
+        )
+        Slider(
+            value = sensitivity,
+            onValueChange = { 
+                sensitivity = it
+                prefs.edit().putFloat(Config.KEY_SENSITIVITY, it).apply()
+            },
+            colors = SliderDefaults.colors(thumbColor = SunRed, activeTrackColor = RayGold)
         )
 
+        Spacer(modifier = Modifier.height(24.dp))
         HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
         // --- FOCUS SECTION ---
         SectionHeader("FOCUS (Toward What)")
-        ConfigCheckbox("SELF (Internalized)", Config.isEnabled(currentMask, Config.FOCUS_SELF), checkColors) {
-            updateMask(Config.FOCUS_SELF)
-        }
-        ConfigCheckbox("OTHERS (Externalized)", Config.isEnabled(currentMask, Config.FOCUS_OTHERS), checkColors) {
-            updateMask(Config.FOCUS_OTHERS)
-        }
-        ConfigCheckbox("WORLD (Systemic)", Config.isEnabled(currentMask, Config.FOCUS_WORLD), checkColors) {
-            updateMask(Config.FOCUS_WORLD)
-        }
+        ConfigCheckbox("SELF", Config.isEnabled(currentMask, Config.FOCUS_SELF), checkColors) { updateMask(Config.FOCUS_SELF) }
+        ConfigCheckbox("OTHERS", Config.isEnabled(currentMask, Config.FOCUS_OTHERS), checkColors) { updateMask(Config.FOCUS_OTHERS) }
+        ConfigCheckbox("WORLD", Config.isEnabled(currentMask, Config.FOCUS_WORLD), checkColors) { updateMask(Config.FOCUS_WORLD) }
 
         Spacer(modifier = Modifier.height(24.dp))
-
-        // --- TYPE SECTION ---
-        SectionHeader("TYPE (Flavor)")
-        ConfigCheckbox("DESPAIR (Hopelessness)", Config.isEnabled(currentMask, Config.TYPE_DESPAIR), checkColors) {
-            updateMask(Config.TYPE_DESPAIR)
-        }
-        ConfigCheckbox("WORTHLESSNESS (Internal Critique)", Config.isEnabled(currentMask, Config.TYPE_WORTHLESS), checkColors) {
-            updateMask(Config.TYPE_WORTHLESS)
-        }
-        ConfigCheckbox("ANGER/BLAME (Hostility)", Config.isEnabled(currentMask, Config.TYPE_ANGER), checkColors) {
-            updateMask(Config.TYPE_ANGER)
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
         HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
-        // --- THE TESTING VOID ---
-        SectionHeader("INTERVENTION TEST CHAMBER")
-        Text(
-            "Type triggers like 'pointless' (Mild), 'worthless' (Moderate), or 'failure' (Visceral) to verify visual interference.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Color.White.copy(alpha = 0.5f),
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+        // --- LEDGER ANALYTICS ---
+        SectionHeader("THE LEDGER (Daily Despair)")
+        if (dailyStats.isEmpty()) {
+            Text("No cognitive collapses recorded. Yet.", color = Color.White.copy(alpha = 0.4f))
+        } else {
+            dailyStats.forEach { stat ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(stat.dateLabel, color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                    Text("${stat.count} events", color = RayGold, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
 
-        TextField(
-            value = testInput,
-            onValueChange = { testInput = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Speak into the abyss...", color = Color.White.copy(alpha = 0.3f)) },
-            colors = TextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedContainerColor = Color.Black.copy(alpha = 0.2f),
-                unfocusedContainerColor = Color.Black.copy(alpha = 0.1f),
-                cursorColor = RayGold,
-                focusedIndicatorColor = EyePupilBlue,
-                unfocusedIndicatorColor = Color.Transparent
-            ),
-            singleLine = true
-        )
-
-        Spacer(modifier = Modifier.height(64.dp)) // Clearance for navigation
+        Spacer(modifier = Modifier.height(64.dp))
     }
 }
 
 @Composable
 fun SectionHeader(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
-        color = RayGold,
-        modifier = Modifier.padding(vertical = 16.dp)
-    )
+    Text(text, style = MaterialTheme.typography.labelLarge, color = RayGold, modifier = Modifier.padding(vertical = 16.dp))
 }
 
 @Composable
 fun ConfigCheckbox(label: String, checked: Boolean, colors: CheckboxColors, onCheckedChange: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Row(modifier = Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = checked, onCheckedChange = { _ -> onCheckedChange() }, colors = colors)
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = Color.White,
-            modifier = Modifier.padding(start = 8.dp)
-        )
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = Color.White, modifier = Modifier.padding(start = 8.dp))
     }
 }
