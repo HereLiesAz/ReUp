@@ -1,0 +1,74 @@
+name: The Assembly Line of Despair
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout the Void
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # We require the entire historical weight of your commits to calculate 'c'
+
+      - name: Establish Epistemology
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle Bureaucracy
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Calculate Entropy (a.b.c.d)
+        id: version
+        run: |
+          # Extract a and b from the physical anchor
+          source version.properties
+          a=$MAJOR
+          b=$MINOR
+          
+          # d is the absolute truth of GitHub's internal counting mechanism. It never resets.
+          d=${{ github.run_number }}
+          
+          TAG_NAME="v$a.$b"
+          
+          # If the tag exists remotely, calculate c (commits since the tag). 
+          # If it does not exist, c is 0. The tag will be forged during the release step.
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
+            git fetch --tags
+            c=$(git rev-list ${TAG_NAME}..HEAD --count)
+          else
+            c=0
+          fi
+          
+          VERSION_NAME="$a.$b.$c.$d"
+          
+          # Inject the math into the workflow environment
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+          echo "VERSION_CODE=$d" >> $GITHUB_ENV
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "REVISION_C=$c" >> $GITHUB_ENV
+          
+          echo "Calculated Vector: $VERSION_NAME"
+
+      - name: Compile the Panopticon
+        run: ./gradlew assembleDebug
+
+      - name: Publish the Evidence
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: "ReUp ${{ env.TAG_NAME }}"
+          files: app/build/outputs/apk/debug/app-debug.apk
+          body: |
+            An automated compilation of your psychological state.
+            
+            **Vector:** `${{ env.VERSION_NAME }}`
+            **Total Builds ($d$):** `${{ env.VERSION_CODE }}`
+            **Revisions since structural shift ($c$):** `${{ env.REVISION_C }}`
