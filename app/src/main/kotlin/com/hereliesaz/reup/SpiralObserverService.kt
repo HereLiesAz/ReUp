@@ -184,4 +184,86 @@ class SpiralObserverService : AccessibilityService() {
             }
         }
     }
+}            val despairScore = results.find { it.label.equals("Negative", ignoreCase = true) }?.score ?: 0f
+            
+            if (despairScore >= sensitivity) {
+                Log.i(TAG, "NEURAL DETECTION: Despair probability ($despairScore) exceeds paranoia threshold.")
+                interventionTriggered = true
+                
+                // For neural detections, we default to internal despair if no lexicon match exists
+                serviceScope.launch { dbHelper.logDistortion(fullText.take(50), Config.FOCUS_SELF, Config.TYPE_DESPAIR) }
+                detectedColor = calculateColorForSeverity(despairScore)
+            }
+        }
+
+        // Phase 2: Lexicon Verification (High-certainty override and vector mapping)
+        for ((trigger, vectors) in spiralLexicon) {
+            if (fullText.contains(trigger)) {
+                val (focus, type, severity) = vectors
+                if (Config.isEnabled(activeMask, focus) && Config.isEnabled(activeMask, type)) {
+                    Log.i(TAG, "LEXICON MATCH: '$trigger' confirmed. Severity: $severity")
+                    interventionTriggered = true
+                    serviceScope.launch { dbHelper.logDistortion(trigger, focus, type) }
+                    detectedColor = calculateColorForSeverity(severity)
+                    break
+                }
+            }
+        }
+
+        if (interventionTriggered && source != null) {
+            source.getBoundsInScreen(bounds)
+            detectedColor?.let { overlayView?.highlightText(bounds, it) }
+        } else {
+            overlayView?.clearInterference()
+        }
+
+        source?.recycle()
+    }
+
+    private fun calculateColorForSeverity(severity: Float): Int {
+        val baseColor = when {
+            severity >= Config.SEVERITY_VISCERAL_THRESHOLD -> Config.SEVERITY_VISCERAL_COLOR
+            severity >= Config.SEVERITY_MODERATE_THRESHOLD -> Config.SEVERITY_MODERATE_COLOR
+            else -> Config.SEVERITY_MILD_COLOR
+        }
+        return baseColor.copy(alpha = 0.8f).value.toInt()
+    }
+
+    override fun onInterrupt() { overlayView?.clearInterference() }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        overlayView?.let { windowManager?.removeView(it) }
+        dbHelper.close()
+    }
+
+    private inner class HighlightView(context: Context) : View(context) {
+        private val paint = Paint().apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 12f // Slightly thicker for visceral impact
+            isAntiAlias = true
+        }
+        private var targetBounds: Rect? = null
+        private var isInterfering = false
+
+        fun highlightText(bounds: Rect, color: Int) {
+            isInterfering = true
+            targetBounds = Rect(bounds)
+            paint.color = color
+            invalidate()
+        }
+
+        fun clearInterference() {
+            isInterfering = false
+            targetBounds = null
+            invalidate()
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            if (isInterfering) {
+                targetBounds?.let { canvas.drawRect(it, paint) }
+            }
+        }
+    }
 }
