@@ -3,7 +3,6 @@ package com.hereliesaz.reup
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.RectF
@@ -13,6 +12,7 @@ import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import com.hereliesaz.reup.ui.theme.TranslucentHemorrhage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -52,8 +52,7 @@ class SpiralObserverService : AccessibilityService() {
         try {
             windowManager?.addView(overlayView, params)
         } catch (e: Exception) {
-            // If the user hasn't granted SYSTEM_ALERT_WINDOW, we silently fail to draw.
-            // The MainActivity must handle the interrogation.
+            // Wait for authorization.
         }
     }
 
@@ -73,7 +72,6 @@ class SpiralObserverService : AccessibilityService() {
             if (startIndex >= 0) {
                 val lastLogged = lastLoggedWords[word] ?: 0L
                 if (currentTime - lastLogged > 10000) {
-                    // Shove the disk I/O off the main thread. Accessibility events must be processed immediately.
                     serviceScope.launch {
                         dbHelper.logDistortion(word)
                     }
@@ -105,7 +103,6 @@ class SpiralObserverService : AccessibilityService() {
             }
         }
 
-        // If rectsToDraw is empty (they deleted the word), the view clears itself.
         overlayView?.updateRects(rectsToDraw)
         source.recycle()
     }
@@ -120,7 +117,7 @@ class SpiralObserverService : AccessibilityService() {
             try {
                 windowManager?.removeView(it)
             } catch (e: Exception) {
-                // Already consumed by the void.
+                // Gone.
             }
         }
         dbHelper.close()
@@ -128,7 +125,7 @@ class SpiralObserverService : AccessibilityService() {
 
     private inner class HighlightView(context: Context) : View(context) {
         private val paint = Paint().apply {
-            color = Color.parseColor("#668B0000") 
+            color = TranslucentHemorrhage.value.toInt()
             style = Paint.Style.FILL
         }
         private var rects: List<RectF> = emptyList()
