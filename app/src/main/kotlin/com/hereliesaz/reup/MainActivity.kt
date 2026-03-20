@@ -1,5 +1,6 @@
 package com.hereliesaz.reup
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -13,6 +14,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,6 +44,9 @@ class MainActivity : ComponentActivity() {
             ReUpTheme {
                 var data by remember { mutableStateOf<List<DailyDistortion>>(emptyList()) }
                 var hasOverlayPermission by remember { mutableStateOf(Settings.canDrawOverlays(this)) }
+                
+                val sharedPrefs = getSharedPreferences("ReUpPrefs", Context.MODE_PRIVATE)
+                var threshold by remember { mutableFloatStateOf(sharedPrefs.getFloat("sensitivity", 0.7f)) }
 
                 LaunchedEffect(Unit) {
                     withContext(Dispatchers.IO) {
@@ -66,13 +72,22 @@ class MainActivity : ComponentActivity() {
                             hasOverlayPermission = Settings.canDrawOverlays(this@MainActivity)
                         }
                     } else if (data.isEmpty()) {
-                        Text(
-                            text = "THE VOID IS EMPTY.",
-                            style = MaterialTheme.typography.displayMedium,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(32.dp)
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "THE VOID IS EMPTY.",
+                                style = MaterialTheme.typography.displayMedium,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(32.dp)
+                            )
+                            SensitivityControl(
+                                threshold = threshold,
+                                onThresholdChange = { 
+                                    threshold = it
+                                    sharedPrefs.edit().putFloat("sensitivity", it).apply()
+                                }
+                            )
+                        }
                     } else {
                         Column(
                             modifier = Modifier
@@ -87,6 +102,16 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.padding(bottom = 48.dp)
                             )
                             DespairChart(data = data)
+                            
+                            Spacer(modifier = Modifier.height(48.dp))
+                            
+                            SensitivityControl(
+                                threshold = threshold,
+                                onThresholdChange = { 
+                                    threshold = it
+                                    sharedPrefs.edit().putFloat("sensitivity", it).apply()
+                                }
+                            )
                         }
                     }
                 }
@@ -97,6 +122,28 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         setContent { /* Recompose */ }
+    }
+}
+
+@Composable
+fun SensitivityControl(threshold: Float, onThresholdChange: (Float) -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "SENSITIVITY THRESHOLD: ${(threshold * 100).toInt()}%",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        Slider(
+            value = threshold,
+            onValueChange = onThresholdChange,
+            valueRange = 0.1f..0.9f,
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+                inactiveTrackColor = MaterialTheme.colorScheme.surface
+            )
+        )
     }
 }
 
