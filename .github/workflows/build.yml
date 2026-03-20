@@ -60,7 +60,8 @@ jobs:
         with:
           tag_name: ${{ env.TAG_NAME }}
           name: "ReUp ${{ env.TAG_NAME }}"
-          files: app/build/outputs/apk/debug/ReUp-debug-${{ env.VERSION_NAME }}.apk
+          prerelease: true
+          files: app/build/outputs/apk/debug/*.apk
           body: |
             An automated compilation of your psychological state.
             
