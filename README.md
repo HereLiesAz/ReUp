@@ -4,8 +4,8 @@ Sometimes all it takes to break a habit is a gentle reminder. Sometimes it takes
 
 ## Features
 
-* **Real-Time On-Device ML Inference:** Utilizes an `AccessibilityService` alongside a pre-trained LiteRT (TensorFlow Lite) natural language classifier to read text fields across all applications and mathematically evaluate the probability of despair in real-time.
-* **Adjustable Paranoia:** A Jetpack Compose UI allows the user to dynamically adjust the neural network's sensitivity threshold, dictating exactly how much negativity is permitted before the machine intervenes.
+* **Real-Time On-Device ML Inference:** Utilizes an `AccessibilityService` alongside a LiteRT (TensorFlow Lite) `NLClassifier` to mathematically evaluate the probability of despair in real-time.
+* **Adjustable Paranoia:** A Jetpack Compose UI allows the user to dynamically adjust the neural network's sensitivity threshold ($P_{despair}$), dictating exactly how much negativity is permitted before the machine intervenes.
 * **Visual Feedback:** Employs a `SYSTEM_ALERT_WINDOW` overlay to highlight detected negative text with a translucent red hemorrhage, physically drawing the user's attention to their own cognitive distortions.
 * **Data Logging:** Silently records the exact phrasing and timestamps of detected despair into a local SQLite database, utilizing coroutines to ensure the void is documented without choking the main thread.
 * **Analytics Visualization:** Renders logged data as a jagged line chart against the relentless progression of time.
@@ -17,8 +17,8 @@ Sometimes all it takes to break a habit is a gentle reminder. Sometimes it takes
 * **Background Processing:** Kotlin Coroutines (`Dispatchers.IO`)
 * **Local Storage:** SQLite (`SQLiteOpenHelper`)
 * **Machine Learning:** LiteRT / TensorFlow Lite Task Library (`NLClassifier`)
-* **Core APIs:** * `AccessibilityService` (for voyeurism and semantic coordinate retrieval via `EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY`)
-    * `WindowManager` (for projecting the `HighlightView` overlay)
+* **Core APIs:** * `AccessibilityService` (for surveillance and semantic coordinate retrieval via `EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY`)
+    * `WindowManager` (for projecting the `HighlightView` overlay via `SYSTEM_ALERT_WINDOW`)
 * **CI/CD:** GitHub Actions (Automated $a.b.c.d$ vectoring and debug APK generation)
 
 ## Permissions Required
