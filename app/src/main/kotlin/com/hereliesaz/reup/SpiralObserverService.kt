@@ -16,20 +16,17 @@ import com.hereliesaz.reup.ui.theme.TranslucentHemorrhage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.tensorflow.lite.task.text.nlclassifier.NLClassifier
 
 class SpiralObserverService : AccessibilityService() {
-
-    private val spiralLexicon = setOf(
-        "pointless", "give up", "never gets better", "always like this", 
-        "failure", "hate myself", "exhausted", "worthless", "fuck it"
-    )
 
     private var windowManager: WindowManager? = null
     private var overlayView: HighlightView? = null
     private lateinit var dbHelper: SpiralDatabaseHelper
     private val serviceScope = CoroutineScope(Dispatchers.IO)
     
-    private val lastLoggedWords = mutableMapOf<String, Long>()
+    private var classifier: NLClassifier? = null
+    private val lastLoggedSentences = mutableMapOf<String, Long>()
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -52,37 +49,64 @@ class SpiralObserverService : AccessibilityService() {
         try {
             windowManager?.addView(overlayView, params)
         } catch (e: Exception) {
-            // Wait for authorization.
+            // Awaiting authorization to hallucinate.
+        }
+
+        try {
+            // Awakening the artificial cortex. Ensure sentiment_classifier.tflite is in the assets folder.
+            val options = NLClassifier.NLClassifierOptions.builder().build()
+            classifier = NLClassifier.createFromFileAndOptions(this, "sentiment_classifier.tflite", options)
+        } catch (e: Exception) {
+            // The machine lacks its brain. It will remain dormant until the model is provided.
         }
     }
 
     @Suppress("DEPRECATION")
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) return
+        if (classifier == null) return
 
         val source = event.source ?: return
-        val currentText = source.text?.toString()?.lowercase() ?: ""
+        val currentText = source.text?.toString() ?: ""
 
         val rectsToDraw = mutableListOf<RectF>()
         val currentTime = System.currentTimeMillis()
 
-        for (word in spiralLexicon) {
-            var startIndex = currentText.indexOf(word)
+        // Deconstruct the text into individual thoughts.
+        val sentences = currentText.split(Regex("(?<=[.!?])\\s+|\\n+"))
+
+        var currentIndexOffset = 0
+
+        for (rawSentence in sentences) {
+            val sentence = rawSentence.trim()
+            if (sentence.length < 3) {
+                currentIndexOffset += rawSentence.length
+                continue
+            }
+
+            // Subject the thought to the neural network.
+            val results = classifier?.classify(sentence) ?: emptyList()
             
-            if (startIndex >= 0) {
-                val lastLogged = lastLoggedWords[word] ?: 0L
+            // Assume the model outputs 'Negative' and 'Positive' labels. 
+            // We isolate the probability of despair.
+            val negativeScore = results.find { it.label.equals("Negative", ignoreCase = true) }?.score ?: 0f
+
+            val startIndex = currentText.indexOf(sentence, currentIndexOffset)
+            
+            if (startIndex >= 0 && negativeScore > 0.7f) {
+                // The thought is toxic. Log it and paint the boundaries.
+                val lastLogged = lastLoggedSentences[sentence] ?: 0L
                 if (currentTime - lastLogged > 10000) {
                     serviceScope.launch {
-                        dbHelper.logDistortion(word)
+                        // Truncate if necessary, but keep the core of the distortion.
+                        dbHelper.logDistortion(sentence.take(50))
                     }
-                    lastLoggedWords[word] = currentTime
+                    lastLoggedSentences[sentence] = currentTime
                 }
-            }
-            
-            while (startIndex >= 0) {
+
                 val args = Bundle().apply {
                     putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_START_INDEX, startIndex)
-                    putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_LENGTH, word.length)
+                    putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_LENGTH, sentence.length)
                 }
 
                 val hasData = source.refreshWithExtraData(
@@ -98,9 +122,9 @@ class SpiralObserverService : AccessibilityService() {
                         }
                     }
                 }
-                
-                startIndex = currentText.indexOf(word, startIndex + word.length)
             }
+            // Advance the pointer so we don't redundantly scan identical sentences.
+            currentIndexOffset = (startIndex.takeIf { it >= 0 } ?: currentIndexOffset) + sentence.length
         }
 
         overlayView?.updateRects(rectsToDraw)
@@ -117,9 +141,10 @@ class SpiralObserverService : AccessibilityService() {
             try {
                 windowManager?.removeView(it)
             } catch (e: Exception) {
-                // Gone.
+                // Already consumed.
             }
         }
+        classifier?.close()
         dbHelper.close()
     }
 
