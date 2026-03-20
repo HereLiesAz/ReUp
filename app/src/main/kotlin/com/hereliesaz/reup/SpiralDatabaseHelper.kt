@@ -4,66 +4,90 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
-import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
-data class DailyDistortion(val date: String, val count: Int)
+// Data structure representing a logged cognitive collapse
+data class DistortionEntry(
+    val id: Long,
+    val text: String,
+    val timestamp: Long,
+    val focusFlag: Int, // The target of the hostility
+    val typeFlag: Int   // The flavor of the toxicity
+)
+
+data class DailyDistortion(
+    val dateLabel: String,
+    val count: Int
+)
 
 class SpiralDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
     companion object {
-        private const val DATABASE_NAME = "SpiralLog.db"
-        private const val DATABASE_VERSION = 1
-        const val TABLE_NAME = "distortions"
-        const val COLUMN_ID = "id"
-        const val COLUMN_TIMESTAMP = "timestamp"
-        const val COLUMN_WORD = "word"
+        private const val DATABASE_NAME = "spiral_ledger.db"
+        private const val DATABASE_VERSION = 2 // Incremented BUREAUCRACY version
+
+        const val TABLE_LEDGER = "ledger"
+        const val COL_ID = "id"
+        const val COL_TEXT = "distortion_text"
+        const val COL_TIMESTAMP = "timestamp"
+        const val COL_FOCUS_FLAG = "focus_flag" // NEW column
+        const val COL_TYPE_FLAG = "type_flag"   // NEW column
     }
 
-    override fun onCreate(db: SQLiteDatabase) {
-        val createTable = """
-            CREATE TABLE $TABLE_NAME (
-                $COLUMN_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                $COLUMN_TIMESTAMP INTEGER,
-                $COLUMN_WORD TEXT
+    override fun onCreate(db: SQLiteDatabase?) {
+        db?.execSQL(
+            """
+            CREATE TABLE $TABLE_LEDGER (
+                $COL_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                $COL_TEXT TEXT NOT NULL,
+                $COL_TIMESTAMP INTEGER NOT NULL,
+                $COL_FOCUS_FLAG INTEGER NOT NULL,
+                $COL_TYPE_FLAG INTEGER NOT NULL
             )
-        """.trimIndent()
-        db.execSQL(createTable)
+            """
+        )
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_NAME")
-        onCreate(db)
-    }
-
-    fun logDistortion(word: String) {
-        val db = this.writableDatabase
-        val values = ContentValues().apply {
-            put(COLUMN_TIMESTAMP, System.currentTimeMillis())
-            put(COLUMN_WORD, word)
+    override fun onUpgrade(db: SQLiteDatabase?, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) {
+            // Migrating the data structures of your past misery.
+            db?.execSQL("ALTER TABLE $TABLE_LEDGER ADD COLUMN $COL_FOCUS_FLAG INTEGER DEFAULT 0")
+            db?.execSQL("ALTER TABLE $TABLE_LEDGER ADD COLUMN $COL_TYPE_FLAG INTEGER DEFAULT 0")
         }
-        db.insert(TABLE_NAME, null, values)
+    }
+
+    fun logDistortion(text: String, focusFlag: Int, typeFlag: Int) {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put(COL_TEXT, text)
+            put(COL_TIMESTAMP, Date().time)
+            put(COL_FOCUS_FLAG, focusFlag)
+            put(COL_TYPE_FLAG, typeFlag)
+        }
+        db.insert(TABLE_LEDGER, null, values)
         db.close()
     }
 
+    /**
+     * Aggregates the history of your cognitive collapses by day.
+     */
     fun getDailyCounts(): List<DailyDistortion> {
-        val db = this.readableDatabase
-        val counts = LinkedHashMap<String, Int>()
-        val cursor = db.rawQuery("SELECT $COLUMN_TIMESTAMP FROM $TABLE_NAME ORDER BY $COLUMN_TIMESTAMP ASC", null)
+        val list = mutableListOf<DailyDistortion>()
+        val db = readableDatabase
         
-        val formatter = SimpleDateFormat("MM/dd", Locale.getDefault())
+        // Simple aggregation by day using SQLite date functions
+        val query = "SELECT date(timestamp / 1000, 'unixepoch') as day, count(*) as cnt FROM $TABLE_LEDGER GROUP BY day ORDER BY day ASC LIMIT 7"
+        val cursor = db.rawQuery(query, null)
         
         if (cursor.moveToFirst()) {
             do {
-                val timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_TIMESTAMP))
-                val dateString = formatter.format(Date(timestamp))
-                counts[dateString] = counts.getOrDefault(dateString, 0) + 1
+                val day = cursor.getString(0) ?: "Unknown"
+                val count = cursor.getInt(1)
+                list.add(DailyDistortion(day, count))
             } while (cursor.moveToNext())
         }
         cursor.close()
         db.close()
-        
-        return counts.map { DailyDistortion(it.key, it.value) }
+        return list
     }
 }

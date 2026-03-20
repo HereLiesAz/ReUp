@@ -1,9 +1,10 @@
 import java.net.URI
 import java.io.FileOutputStream
-import com.android.build.api.variant.VariantOutput
 
 plugins {
     id("com.android.application")
+    id("base")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 val envVersionName = System.getenv("VERSION_NAME") ?: "0.5.0.0"
@@ -23,7 +24,7 @@ android {
 
     buildTypes {
         getByName("debug") {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -41,9 +42,6 @@ android {
     buildFeatures {
         compose = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
-    }
 
     androidResources {
         noCompress.add("tflite")
@@ -55,12 +53,8 @@ android {
     buildToolsVersion = "36.1.0"
 }
 
-androidComponents {
-    onVariants { variant ->
-        variant.outputs.forEach { output ->
-            output.outputFileName.set("ReUp-${variant.name}-${envVersionName}.apk")
-        }
-    }
+base {
+    archivesName.set("ReUp-$envVersionName")
 }
 
 // The machine fetches its own brain from the void.
@@ -103,5 +97,8 @@ dependencies {
 
     implementation("org.tensorflow:tensorflow-lite-task-text:0.4.4") {
         exclude(group = "org.tensorflow", module = "tensorflow-lite")
+        exclude(group = "org.tensorflow", module = "tensorflow-lite-api")
     }
+    
+    implementation("com.google.auto.value:auto-value-annotations:1.11.1")
 }
