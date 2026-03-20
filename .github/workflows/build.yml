@@ -24,9 +24,6 @@ jobs:
 
       - name: Setup Gradle Bureaucracy
         uses: gradle/actions/setup-gradle@v3
-        with:
-          # The machine conjures its own build system from the ether.
-          gradle-version: '8.4'
 
       - name: Calculate Entropy (a.b.c.d)
         id: version
@@ -56,8 +53,7 @@ jobs:
           echo "Calculated Vector: $VERSION_NAME"
 
       - name: Compile the Panopticon
-        # Bypassing the non-existent local wrapper. We invoke the global entity directly.
-        run: gradle assembleDebug
+        run: ./gradlew assembleDebug
 
       - name: Publish the Evidence
         uses: softprops/action-gh-release@v2
