@@ -3,6 +3,7 @@
 package com.hereliesaz.reup
 
 import android.content.Context
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -11,14 +12,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.reup.ui.theme.*
 import com.hereliesaz.reup.SpiralConfig as Config
 
 /**
  * The command center for your surveillance.
- * Now includes Adjustable Paranoia and Daily Analytics.
+ * Equipped with Adjustable Paranoia and the Jagged Line Chart of Relentless Progression.
  */
 @Composable
 fun SurveillanceConfigurationScreen(context: Context) {
@@ -40,11 +44,6 @@ fun SurveillanceConfigurationScreen(context: Context) {
         prefs.edit().putInt(Config.KEY_FILTER_MASK, currentMask).apply()
     }
 
-    val checkColors = CheckboxDefaults.colors(
-        checkedColor = EyePupilBlue,
-        uncheckedColor = Color.White.copy(alpha = 0.6f)
-    )
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -58,12 +57,11 @@ fun SurveillanceConfigurationScreen(context: Context) {
         
         Spacer(modifier = Modifier.height(24.dp))
 
-        // --- ADJUSTABLE PARANOIA ---
-        SectionHeader("ADJUSTABLE PARANOIA (Sensitivity)")
+        SectionHeader("ADJUSTABLE PARANOIA")
         Text(
-            "Dictates the neural network's threshold for detecting despair ($sensitivity).",
+            "Neural sensitivity threshold ($sensitivity). Lower values invite more interference.",
             style = MaterialTheme.typography.bodySmall,
-            color = Color.White.copy(alpha = 0.7f)
+            color = Color.White.copy(alpha = 0.6f)
         )
         Slider(
             value = sensitivity,
@@ -77,32 +75,64 @@ fun SurveillanceConfigurationScreen(context: Context) {
         Spacer(modifier = Modifier.height(24.dp))
         HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
-        // --- FOCUS SECTION ---
-        SectionHeader("FOCUS (Toward What)")
-        ConfigCheckbox("SELF", Config.isEnabled(currentMask, Config.FOCUS_SELF), checkColors) { updateMask(Config.FOCUS_SELF) }
-        ConfigCheckbox("OTHERS", Config.isEnabled(currentMask, Config.FOCUS_OTHERS), checkColors) { updateMask(Config.FOCUS_OTHERS) }
-        ConfigCheckbox("WORLD", Config.isEnabled(currentMask, Config.FOCUS_WORLD), checkColors) { updateMask(Config.FOCUS_WORLD) }
+        SectionHeader("THE JAGGED VOID (Despair Analytics)")
+        JaggedLineChart(dailyStats)
 
         Spacer(modifier = Modifier.height(24.dp))
         HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
-        // --- LEDGER ANALYTICS ---
-        SectionHeader("THE LEDGER (Daily Despair)")
-        if (dailyStats.isEmpty()) {
-            Text("No cognitive collapses recorded. Yet.", color = Color.White.copy(alpha = 0.4f))
-        } else {
-            dailyStats.forEach { stat ->
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(stat.dateLabel, color = Color.White, style = MaterialTheme.typography.bodyMedium)
-                    Text("${stat.count} events", color = RayGold, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        }
+        SectionHeader("FOCUS VECTORS")
+        val checkColors = CheckboxDefaults.colors(checkedColor = EyePupilBlue, uncheckedColor = Color.White.copy(alpha = 0.5f))
+        ConfigCheckbox("SELF", Config.isEnabled(currentMask, Config.FOCUS_SELF), checkColors) { updateMask(Config.FOCUS_SELF) }
+        ConfigCheckbox("OTHERS", Config.isEnabled(currentMask, Config.FOCUS_OTHERS), checkColors) { updateMask(Config.FOCUS_OTHERS) }
+        ConfigCheckbox("WORLD", Config.isEnabled(currentMask, Config.FOCUS_WORLD), checkColors) { updateMask(Config.FOCUS_WORLD) }
 
         Spacer(modifier = Modifier.height(64.dp))
+    }
+}
+
+@Composable
+fun JaggedLineChart(data: List<DailyDistortion>) {
+    val counts = data.map { it.count.toFloat() }
+    val maxCount = (counts.maxOrNull() ?: 1f).coerceAtLeast(5f)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(150.dp)
+            .background(Color.Black.copy(alpha = 0.2f))
+            .padding(8.dp)
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            if (counts.size < 2) {
+                drawContext.canvas.nativeCanvas.drawText("Awaiting sufficient despair...", 40f, 80f, android.graphics.Paint().apply {
+                    color = android.graphics.Color.GRAY
+                    textSize = 40f
+                })
+                return@Canvas
+            }
+
+            val width = size.width
+            val height = size.height
+            val spacing = width / (counts.size - 1)
+            
+            val path = Path().apply {
+                counts.forEachIndexed { index, count ->
+                    val x = index * spacing
+                    val y = height - (count / maxCount * height)
+                    if (index == 0) moveTo(x, y) else lineTo(x, y)
+                }
+            }
+
+            drawPath(path = path, color = RayGold, style = Stroke(width = 4f))
+            
+            // Draw data points
+            counts.forEachIndexed { index, count ->
+                val x = index * spacing
+                val y = height - (count / maxCount * height)
+                drawCircle(color = SunRed, radius = 6f, center = Offset(x, y))
+            }
+        }
     }
 }
 
@@ -113,7 +143,7 @@ fun SectionHeader(text: String) {
 
 @Composable
 fun ConfigCheckbox(label: String, checked: Boolean, colors: CheckboxColors, onCheckedChange: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = checked, onCheckedChange = { _ -> onCheckedChange() }, colors = colors)
         Text(label, style = MaterialTheme.typography.bodyLarge, color = Color.White, modifier = Modifier.padding(start = 8.dp))
     }
