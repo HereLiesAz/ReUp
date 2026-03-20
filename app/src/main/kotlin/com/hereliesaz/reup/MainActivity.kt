@@ -18,12 +18,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.hereliesaz.reup.ui.theme.ReUpTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -32,14 +31,14 @@ class MainActivity : ComponentActivity() {
     private val overlayPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        // We do not care about the result code. We merely refresh the UI state.
+        // Refresh UI state
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            MaterialTheme {
+            ReUpTheme {
                 var data by remember { mutableStateOf<List<DailyDistortion>>(emptyList()) }
                 var hasOverlayPermission by remember { mutableStateOf(Settings.canDrawOverlays(this)) }
 
@@ -54,7 +53,7 @@ class MainActivity : ComponentActivity() {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black),
+                        .background(MaterialTheme.colorScheme.background),
                     contentAlignment = Alignment.Center
                 ) {
                     if (!hasOverlayPermission) {
@@ -68,9 +67,10 @@ class MainActivity : ComponentActivity() {
                         }
                     } else if (data.isEmpty()) {
                         Text(
-                            text = "The void is currently empty.\nEnable the Accessibility Service in OS Settings to begin.",
-                            color = Color.DarkGray,
-                            fontFamily = FontFamily.Monospace,
+                            text = "THE VOID IS EMPTY.",
+                            style = MaterialTheme.typography.displayMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            textAlign = TextAlign.Center,
                             modifier = Modifier.padding(32.dp)
                         )
                     } else {
@@ -81,11 +81,10 @@ class MainActivity : ComponentActivity() {
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "GEOMETRY OF DESPAIR",
-                                color = Color.DarkGray,
-                                fontSize = 14.sp,
-                                fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.padding(bottom = 24.dp)
+                                text = "ENTROPY",
+                                style = MaterialTheme.typography.displayLarge,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(bottom = 48.dp)
                             )
                             DespairChart(data = data)
                         }
@@ -97,31 +96,41 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Force UI to recompose if they magically enabled the permission in the background.
-        setContent { /* Re-evaluate state via standard Compose mechanics */ }
+        setContent { /* Recompose */ }
     }
 }
 
 @Composable
 fun PermissionPrompt(onRequestPermission: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = Modifier.padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Text(
-            text = "AUTHORIZATION REQUIRED",
-            color = Color(0xFF8B0000),
-            fontFamily = FontFamily.Monospace,
+            text = "AUTHORIZATION",
+            style = MaterialTheme.typography.displayMedium,
+            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(bottom = 16.dp)
         )
         Text(
-            text = "To project hallucinations onto other applications, you must grant the 'Display over other apps' permission.",
-            color = Color.LightGray,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.padding(bottom = 24.dp, start = 32.dp, end = 32.dp)
+            text = "SYSTEM_ALERT_WINDOW required for cognitive interference.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(bottom = 32.dp)
         )
         Button(
             onClick = onRequestPermission,
-            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary
+            ),
+            shape = MaterialTheme.shapes.medium
         ) {
-            Text("GRANT ACCESS", color = Color.Black, fontFamily = FontFamily.Monospace)
+            Text(
+                text = "GRANT ACCESS", 
+                style = MaterialTheme.typography.labelLarge
+            )
         }
     }
 }
@@ -129,7 +138,8 @@ fun PermissionPrompt(onRequestPermission: () -> Unit) {
 @Composable
 fun DespairChart(data: List<DailyDistortion>) {
     val maxCount = remember(data) { data.maxOfOrNull { it.count }?.toFloat()?.takeIf { it > 0 } ?: 1f }
-    val lineColor = Color(0xFF8B0000) 
+    val lineColor = MaterialTheme.colorScheme.primary
+    val nodeColor = MaterialTheme.colorScheme.onBackground
 
     Canvas(
         modifier = Modifier
@@ -153,8 +163,8 @@ fun DespairChart(data: List<DailyDistortion>) {
             }
             
             drawCircle(
-                color = Color.DarkGray,
-                radius = 6f,
+                color = nodeColor,
+                radius = 8f,
                 center = Offset(x, y)
             )
         }
@@ -162,7 +172,7 @@ fun DespairChart(data: List<DailyDistortion>) {
         drawPath(
             path = path,
             color = lineColor,
-            style = Stroke(width = 8f)
+            style = Stroke(width = 12f)
         )
     }
 }
