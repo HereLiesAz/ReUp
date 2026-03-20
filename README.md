@@ -1,6 +1,6 @@
 # ReUp
 
-ReUp is an Android accessibility tool designed to assist with cognitive behavioral tracking and emotional regulation. By monitoring text input across the device in real-time, the application identifies negative sentiments or cognitive distortions and provides immediate visual feedback, allowing users to recognize and interrupt downward psychological spirals.
+Sometimes all it takes to break a habit is a gentle reminder. Sometimes it takes more, sure, but it's at least a starting point. When it comes to pessimism, undue negativity, or subtle acts of self-deprication, you usually don't even notice that that's what's happening. And if it's a human being reminding you, it can feel like a personal assault. ReUp is a non-human reminder, and that's all. It won't stop you from being negative. It's only job is to gently let you know about the negative patterns in your speech, in case you didn't. The rest is up to you. (And you can do it! Yay! Go team!)
 
 ## Features
 
