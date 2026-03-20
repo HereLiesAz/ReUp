@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">ReUp</string>
+    <string name="accessibility_service_description">An automated superego monitoring keystrokes for cognitive distortions.</string>
+</resources>
