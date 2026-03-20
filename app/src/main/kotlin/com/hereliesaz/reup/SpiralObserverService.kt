@@ -53,7 +53,6 @@ class SpiralObserverService : AccessibilityService() {
         }
 
         try {
-            // Awakening the artificial cortex. Ensure sentiment_classifier.tflite is in the assets folder.
             val options = NLClassifier.NLClassifierOptions.builder().build()
             classifier = NLClassifier.createFromFileAndOptions(this, "sentiment_classifier.tflite", options)
         } catch (e: Exception) {
@@ -71,8 +70,11 @@ class SpiralObserverService : AccessibilityService() {
 
         val rectsToDraw = mutableListOf<RectF>()
         val currentTime = System.currentTimeMillis()
+        
+        // Interrogate SharedPreferences for your current tolerance for misery.
+        val sharedPrefs = getSharedPreferences("ReUpPrefs", Context.MODE_PRIVATE)
+        val sensitivityThreshold = sharedPrefs.getFloat("sensitivity", 0.7f)
 
-        // Deconstruct the text into individual thoughts.
         val sentences = currentText.split(Regex("(?<=[.!?])\\s+|\\n+"))
 
         var currentIndexOffset = 0
@@ -84,21 +86,16 @@ class SpiralObserverService : AccessibilityService() {
                 continue
             }
 
-            // Subject the thought to the neural network.
             val results = classifier?.classify(sentence) ?: emptyList()
             
-            // Assume the model outputs 'Negative' and 'Positive' labels. 
-            // We isolate the probability of despair.
             val negativeScore = results.find { it.label.equals("Negative", ignoreCase = true) }?.score ?: 0f
 
             val startIndex = currentText.indexOf(sentence, currentIndexOffset)
             
-            if (startIndex >= 0 && negativeScore > 0.7f) {
-                // The thought is toxic. Log it and paint the boundaries.
+            if (startIndex >= 0 && negativeScore > sensitivityThreshold) {
                 val lastLogged = lastLoggedSentences[sentence] ?: 0L
                 if (currentTime - lastLogged > 10000) {
                     serviceScope.launch {
-                        // Truncate if necessary, but keep the core of the distortion.
                         dbHelper.logDistortion(sentence.take(50))
                     }
                     lastLoggedSentences[sentence] = currentTime
@@ -123,7 +120,6 @@ class SpiralObserverService : AccessibilityService() {
                     }
                 }
             }
-            // Advance the pointer so we don't redundantly scan identical sentences.
             currentIndexOffset = (startIndex.takeIf { it >= 0 } ?: currentIndexOffset) + sentence.length
         }
 
