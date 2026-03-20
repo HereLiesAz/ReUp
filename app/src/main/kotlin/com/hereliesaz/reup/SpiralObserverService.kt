@@ -119,7 +119,11 @@ class SpiralObserverService : AccessibilityService() {
     }
 
     private inner class HighlightView(context: Context) : View(context) {
-        private val paint = Paint().apply { style = Paint.Style.FILL }
+        private val paint = Paint().apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 8f // Visible but thin outline
+            isAntiAlias = true
+        }
         private var targetBounds: Rect? = null
         private var isInterfering = false
 
