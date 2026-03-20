@@ -1,12 +1,12 @@
-import java.net.URL
+import java.net.URI
 import java.io.FileOutputStream
+import com.android.build.api.variant.VariantOutput
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
 }
 
-val envVersionName = System.getenv("VERSION_NAME") ?: "0.3.0.0"
+val envVersionName = System.getenv("VERSION_NAME") ?: "0.5.0.0"
 val envVersionCode = System.getenv("VERSION_CODE")?.toInt() ?: 1
 
 android {
@@ -73,7 +73,7 @@ tasks.register("downloadCortex") {
         if (!destFile.exists()) {
             println("Awaiting neural network geometry...")
             destDir.mkdirs()
-            URL(modelUrl).openStream().use { input ->
+            URI(modelUrl).toURL().openStream().use { input ->
                 FileOutputStream(destFile).use { output ->
                     input.copyTo(output)
                 }
