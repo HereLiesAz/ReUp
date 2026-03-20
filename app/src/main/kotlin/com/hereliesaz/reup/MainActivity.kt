@@ -1,7 +1,10 @@
+// hereliesaz/reup/ReUp-9db2805a9ede9350d55e55d72acf9c1535bb70f4/app/src/main/kotlin/com/hereliesaz/reup/MainActivity.kt
+
 package com.hereliesaz.reup
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.text.TextUtils
@@ -27,7 +30,7 @@ import com.hereliesaz.reup.ui.theme.*
 
 /**
  * The primary anchor point for the digital panopticon.
- * Now equipped with situational awareness to detect when authorization is granted.
+ * Now equipped with situational awareness to detect when overlay and accessibility authorization is granted.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,7 +39,6 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             ReUpTheme(dynamicColor = false) {
-                // The root navigator of your despair
                 ReUpAppNavigator()
             }
         }
@@ -48,14 +50,14 @@ fun ReUpAppNavigator() {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // State representing whether the panopticon's eye is legally open
-    var isServiceEnabled by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
+    var isAccessibilityEnabled by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
+    var isOverlayEnabled by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
 
-    // Observe lifecycle changes. When the user returns from Settings, we re-verify reality.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                isServiceEnabled = isAccessibilityServiceEnabled(context)
+                isAccessibilityEnabled = isAccessibilityServiceEnabled(context)
+                isOverlayEnabled = Settings.canDrawOverlays(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -64,17 +66,15 @@ fun ReUpAppNavigator() {
         }
     }
 
-    if (isServiceEnabled) {
-        // The eye is open. Show the configuration of the surveillance state.
+    if (isAccessibilityEnabled && isOverlayEnabled) {
         SurveillanceConfigurationScreen(context)
     } else {
-        // The eye is blind. Demand authorization.
-        ReUpDashboardMain()
+        ReUpDashboardMain(isAccessibilityEnabled, isOverlayEnabled)
     }
 }
 
 @Composable
-fun ReUpDashboardMain() {
+fun ReUpDashboardMain(isAccessibilityEnabled: Boolean, isOverlayEnabled: Boolean) {
     val context = LocalContext.current
 
     Box(
@@ -92,7 +92,7 @@ fun ReUpDashboardMain() {
             Surface(
                 modifier = Modifier.size(72.dp),
                 shape = CircleShape,
-                color = EyePupilBlue
+                color = if (isAccessibilityEnabled && isOverlayEnabled) EyePupilBlue else SunRed
             ) {
                 Box(
                     modifier = Modifier
@@ -112,14 +112,14 @@ fun ReUpDashboardMain() {
             )
 
             Text(
-                text = "STATUS: DORMANT // BLIND",
+                text = "STATUS: ${if (!isAccessibilityEnabled || !isOverlayEnabled) "DORMANT // BLIND" else "ACTIVE"}",
                 style = MaterialTheme.typography.labelLarge,
                 color = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.padding(top = 8.dp, bottom = 48.dp)
             )
 
             Text(
-                text = "The digital eye is currently closed. To enforce cognitive surveillance and visual intervention, you must grant accessibility authorization.",
+                text = "The digital eye is currently obstructed. To enforce cognitive surveillance and visual intervention, you must grant the following authorizations.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.White,
                 textAlign = TextAlign.Center,
@@ -128,27 +128,38 @@ fun ReUpDashboardMain() {
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            Button(
-                onClick = { openAccessibilitySettings(context) },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = SunRed,
-                    contentColor = Color.White
-                ),
-                contentPadding = PaddingValues(horizontal = 32.dp, vertical = 16.dp),
-                shape = androidx.compose.foundation.shape.AbsoluteRoundedCornerShape(8.dp)
-            ) {
-                Text(
-                    text = "GRANT PANOPTICON AUTHORIZATION",
-                    fontWeight = FontWeight.Bold
-                )
+            if (!isAccessibilityEnabled) {
+                PermissionButton("GRANT ACCESSIBILITY ACCESS") {
+                    openAccessibilitySettings(context)
+                }
+            }
+
+            if (!isOverlayEnabled) {
+                Spacer(modifier = Modifier.height(16.dp))
+                PermissionButton("GRANT OVERLAY PERMISSION") {
+                    openOverlaySettings(context)
+                }
             }
         }
     }
 }
 
-/**
- * Determines if the specific SpiralObserverService has been authorized by the user.
- */
+@Composable
+fun PermissionButton(text: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = SunRed,
+            contentColor = Color.White
+        ),
+        contentPadding = PaddingValues(horizontal = 32.dp, vertical = 16.dp),
+        shape = androidx.compose.foundation.shape.AbsoluteRoundedCornerShape(8.dp),
+        modifier = Modifier.fillMaxWidth(0.8f)
+    ) {
+        Text(text = text, fontWeight = FontWeight.Bold)
+    }
+}
+
 private fun isAccessibilityServiceEnabled(context: Context): Boolean {
     val expectedComponentName = "${context.packageName}/${SpiralObserverService::class.java.canonicalName}"
     val enabledServices = Settings.Secure.getString(
@@ -161,15 +172,21 @@ private fun isAccessibilityServiceEnabled(context: Context): Boolean {
 
     while (colonSplitter.hasNext()) {
         val componentName = colonSplitter.next()
-        if (componentName.equals(expectedComponentName, ignoreCase = true)) {
-            return true
-        }
+        if (componentName.equals(expectedComponentName, ignoreCase = true)) return true
     }
     return false
 }
 
 private fun openAccessibilitySettings(context: Context) {
-    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    })
+}
+
+private fun openOverlaySettings(context: Context) {
+    val intent = Intent(
+        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+        Uri.parse("package:${context.packageName}")
+    ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
     context.startActivity(intent)
 }
