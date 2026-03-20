@@ -1,3 +1,6 @@
+import java.net.URL
+import java.io.FileOutputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -8,12 +11,12 @@ val envVersionCode = System.getenv("VERSION_CODE")?.toInt() ?: 1
 
 android {
     namespace = "com.hereliesaz.reup"
-    compileSdk = 36
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.hereliesaz.reup"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 34
         versionCode = envVersionCode
         versionName = envVersionName
     }
@@ -55,6 +58,33 @@ androidComponents {
     }
 }
 
+// The machine fetches its own brain from the void.
+tasks.register("downloadCortex") {
+    val modelUrl = "https://storage.googleapis.com/download.tensorflow.org/models/tflite/text_classification/text_classification_v2.tflite"
+    val destDir = file("src/main/assets")
+    val destFile = file("$destDir/sentiment_classifier.tflite")
+
+    doLast {
+        if (!destFile.exists()) {
+            println("Awaiting neural network geometry...")
+            destDir.mkdirs()
+            URL(modelUrl).openStream().use { input ->
+                FileOutputStream(destFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            println("Cortex successfully grafted into the panopticon.")
+        } else {
+            println("The machine already possesses a mind. Skipping assimilation.")
+        }
+    }
+}
+
+// Force the brain transplant to occur before the assembly line begins.
+tasks.named("preBuild") {
+    dependsOn("downloadCortex")
+}
+
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
@@ -64,10 +94,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
     
-    // The modern LiteRT engine.
     implementation("com.google.ai.edge.litert:litert:2.1.0")
 
-    // The artificial cortex wrapper. We amputate the legacy engine and force it to use LiteRT.
     implementation("org.tensorflow:tensorflow-lite-task-text:0.4.4") {
         exclude(group = "org.tensorflow", module = "tensorflow-lite")
     }
