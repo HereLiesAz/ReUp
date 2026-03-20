@@ -1,3 +1,5 @@
+// hereliesaz/reup/ReUp-c714b8692ef249c9d91ed57a33a63f43f5c8c59d/app/src/main/kotlin/com/hereliesaz/reup/SpiralDatabaseHelper.kt
+
 package com.hereliesaz.reup
 
 import android.content.ContentValues
@@ -65,18 +67,19 @@ class SpiralDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABAS
             put(COL_TYPE_FLAG, typeFlag)
         }
         db.insert(TABLE_LEDGER, null, values)
-        db.close()
+        // db.close() excised. The machine must not suffocate its own threads.
     }
 
     /**
-     * Aggregates the history of your cognitive collapses by day.
+     * Aggregates the history of your cognitive collapses by day,
+     * now tethered to local temporal reality.
      */
     fun getDailyCounts(): List<DailyDistortion> {
         val list = mutableListOf<DailyDistortion>()
         val db = readableDatabase
         
-        // Simple aggregation by day using SQLite date functions
-        val query = "SELECT date(timestamp / 1000, 'unixepoch') as day, count(*) as cnt FROM $TABLE_LEDGER GROUP BY day ORDER BY day ASC LIMIT 7"
+        // Appended 'localtime' to prevent UTC temporal drift.
+        val query = "SELECT date(timestamp / 1000, 'unixepoch', 'localtime') as day, count(*) as cnt FROM $TABLE_LEDGER GROUP BY day ORDER BY day ASC LIMIT 7"
         val cursor = db.rawQuery(query, null)
         
         if (cursor.moveToFirst()) {
@@ -87,7 +90,7 @@ class SpiralDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABAS
             } while (cursor.moveToNext())
         }
         cursor.close()
-        db.close()
+        // db.close() excised. Let the lifecycle handle the burial.
         return list
     }
 }
