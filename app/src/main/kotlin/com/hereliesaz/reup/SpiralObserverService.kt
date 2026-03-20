@@ -8,20 +8,24 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import com.hereliesaz.reup.SpiralConfig as Config
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.tensorflow.lite.task.text.nlclassifier.NLClassifier
 
 /**
  * The fortified Observer.
- * Now with functional LiteRT neural inference and real-time probability evaluation.
+ * Main thread exhalation achieved. Semantic coordinates acquired.
  */
 class SpiralObserverService : AccessibilityService() {
 
@@ -49,7 +53,6 @@ class SpiralObserverService : AccessibilityService() {
         overlayView = HighlightView(this)
         dbHelper = SpiralDatabaseHelper(this)
 
-        // Initialize the neural network from the downloaded cortex
         try {
             classifier = NLClassifier.createFromFile(this, "sentiment_classifier.tflite")
             Log.i(TAG, "Cortex online. Neural inference active.")
@@ -83,59 +86,103 @@ class SpiralObserverService : AccessibilityService() {
         if (event.eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED &&
             event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
 
-        val source = event.source
+        val source = event.source ?: return
+        
         val eventText = event.text.joinToString(" ").lowercase()
-        val sourceText = source?.text?.toString()?.lowercase() ?: ""
-        val fullText = "$eventText $sourceText".trim()
+        val sourceText = source.text?.toString()?.lowercase() ?: ""
+        val fullText = sourceText.ifBlank { eventText }.trim()
 
-        if (fullText.isBlank()) return
+        if (fullText.isBlank()) {
+            source.recycle()
+            return
+        }
 
         val prefs = getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE)
         val activeMask = prefs.getInt(Config.KEY_FILTER_MASK, Config.DEFAULT_MASK)
         val sensitivity = prefs.getFloat(Config.KEY_SENSITIVITY, Config.DEFAULT_SENSITIVITY)
 
-        var interventionTriggered = false
-        var detectedColor: Int? = null
-        val bounds = Rect()
+        // Exile to the void. The main thread must not suffer the burden of inference.
+        serviceScope.launch {
+            var interventionTriggered = false
+            var detectedColor: Int? = null
+            var targetText = fullText // Default to the entire block if precise targeting fails
 
-        // Phase 1: Neural Interrogation (Probability of Despair)
-        classifier?.let { cortex ->
-            val results = cortex.classify(fullText)
-            // Most TFLite sentiment models use "Negative" and "Positive" labels
-            val despairScore = results.find { it.label.equals("Negative", ignoreCase = true) }?.score ?: 0f
-            
-            if (despairScore >= sensitivity) {
-                Log.i(TAG, "NEURAL DETECTION: Despair probability ($despairScore) exceeds paranoia threshold.")
-                interventionTriggered = true
+            // Phase 1: Neural Interrogation
+            classifier?.let { cortex ->
+                val results = cortex.classify(fullText)
+                val despairScore = results.find { it.label.equals("Negative", ignoreCase = true) }?.score ?: 0f
                 
-                // For neural detections, we default to internal despair if no lexicon match exists
-                serviceScope.launch { dbHelper.logDistortion(fullText.take(50), Config.FOCUS_SELF, Config.TYPE_DESPAIR) }
-                detectedColor = calculateColorForSeverity(despairScore)
+                if (despairScore >= sensitivity) {
+                    if (Config.isEnabled(activeMask, Config.FOCUS_SELF) && Config.isEnabled(activeMask, Config.TYPE_DESPAIR)) {
+                        interventionTriggered = true
+                        dbHelper.logDistortion(fullText.take(50), Config.FOCUS_SELF, Config.TYPE_DESPAIR)
+                        detectedColor = calculateColorForSeverity(despairScore)
+                    }
+                }
             }
-        }
 
-        // Phase 2: Lexicon Verification (High-certainty override and vector mapping)
-        for ((trigger, vectors) in spiralLexicon) {
-            if (fullText.contains(trigger)) {
-                val (focus, type, severity) = vectors
-                if (Config.isEnabled(activeMask, focus) && Config.isEnabled(activeMask, type)) {
-                    Log.i(TAG, "LEXICON MATCH: '$trigger' confirmed. Severity: $severity")
-                    interventionTriggered = true
-                    serviceScope.launch { dbHelper.logDistortion(trigger, focus, type) }
-                    detectedColor = calculateColorForSeverity(severity)
-                    break
+            // Phase 2: Lexicon Verification
+            if (!interventionTriggered) {
+                for ((trigger, vectors) in spiralLexicon) {
+                    if (fullText.contains(trigger)) {
+                        val (focus, type, severity) = vectors
+                        if (Config.isEnabled(activeMask, focus) && Config.isEnabled(activeMask, type)) {
+                            interventionTriggered = true
+                            targetText = trigger
+                            dbHelper.logDistortion(trigger, focus, type)
+                            detectedColor = calculateColorForSeverity(severity)
+                            break
+                        }
+                    }
+                }
+            }
+
+            // Phase 3: Visual Intervention
+            withContext(Dispatchers.Main) {
+                try {
+                    if (interventionTriggered && detectedColor != null) {
+                        val bounds = Rect()
+                        var precisionAchieved = false
+
+                        val startIndex = fullText.indexOf(targetText)
+                        if (startIndex >= 0 && targetText.isNotEmpty()) {
+                            val args = Bundle().apply {
+                                putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_START_INDEX, startIndex)
+                                putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_LENGTH, targetText.length)
+                            }
+                            
+                            val success = source.refreshWithExtraData(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY, args)
+                            
+                            if (success && source.extras != null) {
+                                val parcelables = source.extras.getParcelableArray(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY)
+                                if (parcelables != null && parcelables.isNotEmpty()) {
+                                    val rectFs = parcelables.filterIsInstance<android.graphics.RectF>()
+                                    if (rectFs.isNotEmpty()) {
+                                        val combinedRect = android.graphics.RectF(rectFs.first())
+                                        for (i in 1 until rectFs.size) {
+                                            combinedRect.union(rectFs[i])
+                                        }
+                                        combinedRect.roundOut(bounds)
+                                        precisionAchieved = true
+                                    }
+                                }
+                            }
+                        }
+
+                        // The Fallback: Punish the entire paragraph if the coordinates elude us.
+                        if (!precisionAchieved) {
+                            source.getBoundsInScreen(bounds)
+                        }
+                        
+                        overlayView?.highlightText(bounds, detectedColor!!)
+                    } else {
+                        overlayView?.clearInterference()
+                    }
+                } finally {
+                    source.recycle()
                 }
             }
         }
-
-        if (interventionTriggered && source != null) {
-            source.getBoundsInScreen(bounds)
-            detectedColor?.let { overlayView?.highlightText(bounds, it) }
-        } else {
-            overlayView?.clearInterference()
-        }
-
-        source?.recycle()
     }
 
     private fun calculateColorForSeverity(severity: Float): Int {
@@ -151,6 +198,7 @@ class SpiralObserverService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        serviceScope.cancel()
         overlayView?.let { windowManager?.removeView(it) }
         dbHelper.close()
     }
@@ -158,89 +206,7 @@ class SpiralObserverService : AccessibilityService() {
     private inner class HighlightView(context: Context) : View(context) {
         private val paint = Paint().apply {
             style = Paint.Style.STROKE
-            strokeWidth = 12f // Slightly thicker for visceral impact
-            isAntiAlias = true
-        }
-        private var targetBounds: Rect? = null
-        private var isInterfering = false
-
-        fun highlightText(bounds: Rect, color: Int) {
-            isInterfering = true
-            targetBounds = Rect(bounds)
-            paint.color = color
-            invalidate()
-        }
-
-        fun clearInterference() {
-            isInterfering = false
-            targetBounds = null
-            invalidate()
-        }
-
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            if (isInterfering) {
-                targetBounds?.let { canvas.drawRect(it, paint) }
-            }
-        }
-    }
-}            val despairScore = results.find { it.label.equals("Negative", ignoreCase = true) }?.score ?: 0f
-            
-            if (despairScore >= sensitivity) {
-                Log.i(TAG, "NEURAL DETECTION: Despair probability ($despairScore) exceeds paranoia threshold.")
-                interventionTriggered = true
-                
-                // For neural detections, we default to internal despair if no lexicon match exists
-                serviceScope.launch { dbHelper.logDistortion(fullText.take(50), Config.FOCUS_SELF, Config.TYPE_DESPAIR) }
-                detectedColor = calculateColorForSeverity(despairScore)
-            }
-        }
-
-        // Phase 2: Lexicon Verification (High-certainty override and vector mapping)
-        for ((trigger, vectors) in spiralLexicon) {
-            if (fullText.contains(trigger)) {
-                val (focus, type, severity) = vectors
-                if (Config.isEnabled(activeMask, focus) && Config.isEnabled(activeMask, type)) {
-                    Log.i(TAG, "LEXICON MATCH: '$trigger' confirmed. Severity: $severity")
-                    interventionTriggered = true
-                    serviceScope.launch { dbHelper.logDistortion(trigger, focus, type) }
-                    detectedColor = calculateColorForSeverity(severity)
-                    break
-                }
-            }
-        }
-
-        if (interventionTriggered && source != null) {
-            source.getBoundsInScreen(bounds)
-            detectedColor?.let { overlayView?.highlightText(bounds, it) }
-        } else {
-            overlayView?.clearInterference()
-        }
-
-        source?.recycle()
-    }
-
-    private fun calculateColorForSeverity(severity: Float): Int {
-        val baseColor = when {
-            severity >= Config.SEVERITY_VISCERAL_THRESHOLD -> Config.SEVERITY_VISCERAL_COLOR
-            severity >= Config.SEVERITY_MODERATE_THRESHOLD -> Config.SEVERITY_MODERATE_COLOR
-            else -> Config.SEVERITY_MILD_COLOR
-        }
-        return baseColor.copy(alpha = 0.8f).value.toInt()
-    }
-
-    override fun onInterrupt() { overlayView?.clearInterference() }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        overlayView?.let { windowManager?.removeView(it) }
-        dbHelper.close()
-    }
-
-    private inner class HighlightView(context: Context) : View(context) {
-        private val paint = Paint().apply {
-            style = Paint.Style.STROKE
-            strokeWidth = 12f // Slightly thicker for visceral impact
+            strokeWidth = 12f
             isAntiAlias = true
         }
         private var targetBounds: Rect? = null
