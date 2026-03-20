@@ -3,7 +3,6 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-// Interrogating the environment for the geometry of your despair.
 val envVersionName = System.getenv("VERSION_NAME") ?: "1.0.0.0"
 val envVersionCode = System.getenv("VERSION_CODE")?.toInt() ?: 1
 
@@ -42,9 +41,13 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.1"
     }
+
+    // The compiler must not crush the neural network's weights.
+    androidResources {
+        noCompress.add("tflite")
+    }
 }
 
-// Intercepting the bureaucratic artifact generation to imprint your vector.
 androidComponents {
     onVariants { variant ->
         variant.outputs.forEach { output ->
@@ -61,4 +64,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
+    
+    // The artificial cortex
+    implementation("org.tensorflow:tensorflow-lite-task-text:0.4.4")
 }
