@@ -1,5 +1,8 @@
+// hereliesaz/reup/ReUp-9db2805a9ede9350d55e55d72acf9c1535bb70f4/app/build.gradle.kts
+
 import java.net.URI
 import java.io.FileOutputStream
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -7,8 +10,16 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val envVersionName = System.getenv("VERSION_NAME") ?: "0.5.0.0"
-val envVersionCode = System.getenv("VERSION_CODE")?.toInt() ?: 1
+// Interrogating the source of truth for versioning
+val versionProps = Properties().apply {
+    val file = rootProject.file("version.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+val major = versionProps.getProperty("MAJOR", "0")
+val minor = versionProps.getProperty("MINOR", "0")
+val envVersionName = "$major.$minor.0"
+val envVersionCode = (major.toInt() * 100) + minor.toInt()
 
 android {
     namespace = "com.hereliesaz.reup"
@@ -46,6 +57,7 @@ android {
     androidResources {
         noCompress.add("tflite")
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -57,9 +69,8 @@ base {
     archivesName.set("ReUp-$envVersionName")
 }
 
-// The machine fetches its own brain from the void.
 tasks.register("downloadCortex") {
-    val modelUrl = "https://storage.googleapis.com/download.tensorflow.org/models/tflite/text_classification/text_classification_v2.tflite"
+    val modelUrl = "[https://storage.googleapis.com/download.tensorflow.org/models/tflite/text_classification/text_classification_v2.tflite](https://storage.googleapis.com/download.tensorflow.org/models/tflite/text_classification/text_classification_v2.tflite)"
     val destDir = file("src/main/assets")
     val destFile = file("$destDir/sentiment_classifier.tflite")
 
@@ -79,7 +90,6 @@ tasks.register("downloadCortex") {
     }
 }
 
-// Force the brain transplant to occur before the assembly line begins.
 tasks.named("preBuild") {
     dependsOn("downloadCortex")
 }
@@ -93,8 +103,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
     
-    implementation("com.google.ai.edge.litert:litert:2.1.3")
-
+    // LiteRT (TFLite) Task Library for natural language interpretation
+    // Redundant litert-core removed to prevent dependency hallucinations/collisions
     implementation("org.tensorflow:tensorflow-lite-task-text:0.4.4") {
         exclude(group = "org.tensorflow", module = "tensorflow-lite")
         exclude(group = "org.tensorflow", module = "tensorflow-lite-api")
