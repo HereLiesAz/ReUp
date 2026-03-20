@@ -3,6 +3,11 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Interrogating the environment for the geometry of your despair.
+// If the CI is absent, we default to the origin of the void.
+val envVersionName = System.getenv("VERSION_NAME") ?: "1.0.0.0"
+val envVersionCode = System.getenv("VERSION_CODE")?.toInt() ?: 1
+
 android {
     namespace = "com.hereliesaz.reup"
     compileSdk = 34
@@ -11,8 +16,26 @@ android {
         applicationId = "com.hereliesaz.reup"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = envVersionCode
+        versionName = envVersionName
+    }
+
+    buildTypes {
+        getByName("debug") {
+            // Minification enforced. The panopticon must remain opaque.
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        getByName("release") {
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
     }
 
     buildFeatures {
