@@ -1,4 +1,4 @@
-// hereliesaz/reup/ReUp-9db2805a9ede9350d55e55d72acf9c1535bb70f4/app/src/main/kotlin/com/hereliesaz/reup/SpiralObserverService.kt
+// hereliesaz/reup/ReUp-c714b8692ef249c9d91ed57a33a63f43f5c8c59d/app/src/main/kotlin/com/hereliesaz/reup/SpiralObserverService.kt
 
 package com.hereliesaz.reup
 
@@ -15,6 +15,7 @@ import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.reup.SpiralConfig as Config
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +27,7 @@ import org.tensorflow.lite.task.text.nlclassifier.NLClassifier
 /**
  * The fortified Observer.
  * Main thread exhalation achieved. Semantic coordinates acquired.
+ * Rendering pipeline unclogged.
  */
 class SpiralObserverService : AccessibilityService() {
 
@@ -191,7 +193,8 @@ class SpiralObserverService : AccessibilityService() {
             severity >= Config.SEVERITY_MODERATE_THRESHOLD -> Config.SEVERITY_MODERATE_COLOR
             else -> Config.SEVERITY_MILD_COLOR
         }
-        return baseColor.copy(alpha = 0.8f).value.toInt()
+        // CRITICAL FIX: Compose Color translated to Android ARGB Int
+        return baseColor.copy(alpha = 0.8f).toArgb()
     }
 
     override fun onInterrupt() { overlayView?.clearInterference() }
@@ -204,6 +207,12 @@ class SpiralObserverService : AccessibilityService() {
     }
 
     private inner class HighlightView(context: Context) : View(context) {
+        
+        init {
+            // Force the Android pipeline to acknowledge this view intends to draw.
+            setWillNotDraw(false)
+        }
+        
         private val paint = Paint().apply {
             style = Paint.Style.STROKE
             strokeWidth = 12f
