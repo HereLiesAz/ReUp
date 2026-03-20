@@ -28,20 +28,6 @@ The operating system considers this application fundamentally hostile. It requir
 1.  **Accessibility Service:** To observe the text being typed in active windows and interrogate the host application for screen coordinates.
 2.  **Display over other apps (`SYSTEM_ALERT_WINDOW`):** To draw the intervention overlay on top of the host application.
 
-## Installation & Build
-
-This project utilizes a GitHub Actions workflow for automated builds. If building locally, the Gradle daemon is scripted to automatically download the necessary LiteRT neural network from TensorFlow Hub during the `preBuild` phase.
-
-1.  Clone the void.
-2.  Ensure you have a `version.properties` file in the root directory:
-    ~~~properties
-    MAJOR=1
-    MINOR=0
-    ~~~
-3.  Command the assembly line:
-    ~~~bash
-    ./gradlew assembleDebug
-    ~~~
 
 ## Privacy Note
 
