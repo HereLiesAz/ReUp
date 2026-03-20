@@ -4,7 +4,6 @@ plugins {
 }
 
 // Interrogating the environment for the geometry of your despair.
-// If the CI is absent, we default to the origin of the void.
 val envVersionName = System.getenv("VERSION_NAME") ?: "1.0.0.0"
 val envVersionCode = System.getenv("VERSION_CODE")?.toInt() ?: 1
 
@@ -22,7 +21,6 @@ android {
 
     buildTypes {
         getByName("debug") {
-            // Minification enforced. The panopticon must remain opaque.
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -43,6 +41,15 @@ android {
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.1"
+    }
+}
+
+// Intercepting the bureaucratic artifact generation to imprint your vector.
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            output.outputFileName.set("ReUp-${variant.name}-${envVersionName}.apk")
+        }
     }
 }
 
