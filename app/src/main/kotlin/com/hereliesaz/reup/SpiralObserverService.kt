@@ -1,3 +1,5 @@
+// hereliesaz/reup/ReUp-9db2805a9ede9350d55e55d72acf9c1535bb70f4/app/src/main/kotlin/com/hereliesaz/reup/SpiralObserverService.kt
+
 package com.hereliesaz.reup
 
 import android.accessibilityservice.AccessibilityService
@@ -15,10 +17,11 @@ import com.hereliesaz.reup.SpiralConfig as Config
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.tensorflow.lite.task.text.nlclassifier.NLClassifier
 
 /**
  * The fortified Observer.
- * Now with high-visibility interference and multi-vector text detection.
+ * Now with functional LiteRT neural inference and real-time probability evaluation.
  */
 class SpiralObserverService : AccessibilityService() {
 
@@ -27,7 +30,11 @@ class SpiralObserverService : AccessibilityService() {
     private var overlayView: HighlightView? = null
     private lateinit var dbHelper: SpiralDatabaseHelper
     private val serviceScope = CoroutineScope(Dispatchers.IO)
+    
+    // The machine's actual cortex
+    private var classifier: NLClassifier? = null
 
+    // Fallback/Override lexicon for high-certainty specific vectors
     private val spiralLexicon = mapOf(
         "pointless" to Triple(Config.FOCUS_WORLD, Config.TYPE_DESPAIR, 0.35f),
         "hate" to Triple(Config.FOCUS_OTHERS, Config.TYPE_ANGER, 0.55f),
@@ -41,6 +48,14 @@ class SpiralObserverService : AccessibilityService() {
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         overlayView = HighlightView(this)
         dbHelper = SpiralDatabaseHelper(this)
+
+        // Initialize the neural network from the downloaded cortex
+        try {
+            classifier = NLClassifier.createFromFile(this, "sentiment_classifier.tflite")
+            Log.i(TAG, "Cortex online. Neural inference active.")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize cortex: ${e.message}")
+        }
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -58,76 +73,78 @@ class SpiralObserverService : AccessibilityService() {
         try {
             windowManager?.addView(overlayView, params)
         } catch (e: Exception) {
-            // Permission for 'Display over other apps' might be required on some ROMs
+            Log.e(TAG, "Overlay authorization failed at runtime: ${e.message}")
         }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
 
-        val eventTypeStr = AccessibilityEvent.eventTypeToString(event.eventType)
-        Log.d(TAG, "Event Received: $eventTypeStr from ${event.packageName}")
-
-        // We watch for text changes and window shifts
         if (event.eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED &&
             event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
 
         val source = event.source
-        // Combine event text and source text to avoid missing the evidence
         val eventText = event.text.joinToString(" ").lowercase()
         val sourceText = source?.text?.toString()?.lowercase() ?: ""
-        val fullText = "$eventText $sourceText"
+        val fullText = "$eventText $sourceText".trim()
 
-        if (fullText.isNotBlank() && fullText != " ") {
-            Log.v(TAG, "Parsing Text: $fullText")
-        }
+        if (fullText.isBlank()) return
 
         val prefs = getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE)
         val activeMask = prefs.getInt(Config.KEY_FILTER_MASK, Config.DEFAULT_MASK)
+        val sensitivity = prefs.getFloat(Config.KEY_SENSITIVITY, Config.DEFAULT_SENSITIVITY)
 
+        var interventionTriggered = false
         var detectedColor: Int? = null
         val bounds = Rect()
 
+        // Phase 1: Neural Interrogation (Probability of Despair)
+        classifier?.let { cortex ->
+            val results = cortex.classify(fullText)
+            // Most TFLite sentiment models use "Negative" and "Positive" labels
+            val despairScore = results.find { it.label.equals("Negative", ignoreCase = true) }?.score ?: 0f
+            
+            if (despairScore >= sensitivity) {
+                Log.i(TAG, "NEURAL DETECTION: Despair probability ($despairScore) exceeds paranoia threshold.")
+                interventionTriggered = true
+                
+                // For neural detections, we default to internal despair if no lexicon match exists
+                serviceScope.launch { dbHelper.logDistortion(fullText.take(50), Config.FOCUS_SELF, Config.TYPE_DESPAIR) }
+                detectedColor = calculateColorForSeverity(despairScore)
+            }
+        }
+
+        // Phase 2: Lexicon Verification (High-certainty override and vector mapping)
         for ((trigger, vectors) in spiralLexicon) {
             if (fullText.contains(trigger)) {
                 val (focus, type, severity) = vectors
-
-                val focusEnabled = Config.isEnabled(activeMask, focus)
-                val typeEnabled = Config.isEnabled(activeMask, type)
-                
-                Log.i(TAG, "MATCH: '$trigger' | Focus Enabled: $focusEnabled | Type Enabled: $typeEnabled")
-
-                if (focusEnabled && typeEnabled) {
+                if (Config.isEnabled(activeMask, focus) && Config.isEnabled(activeMask, type)) {
+                    Log.i(TAG, "LEXICON MATCH: '$trigger' confirmed. Severity: $severity")
+                    interventionTriggered = true
                     serviceScope.launch { dbHelper.logDistortion(trigger, focus, type) }
-
-                    // If we have a source node, get its physical location
-                    if (source != null) {
-                        source.getBoundsInScreen(bounds)
-                        Log.d(TAG, "Highlighting Bounds: $bounds")
-                    } else {
-                        Log.w(TAG, "Source node is NULL for trigger '$trigger'. Highlighting impossible.")
-                    }
-
-                    // Bump Alpha to 0xCC (80%) for undeniable visibility
-                    val baseColor = when {
-                        severity >= Config.SEVERITY_VISCERAL_THRESHOLD -> Config.SEVERITY_VISCERAL_COLOR
-                        severity >= Config.SEVERITY_MODERATE_THRESHOLD -> Config.SEVERITY_MODERATE_COLOR
-                        else -> Config.SEVERITY_MILD_COLOR
-                    }
-                    detectedColor = baseColor.copy(alpha = 0.8f).value.toInt()
+                    detectedColor = calculateColorForSeverity(severity)
                     break
                 }
             }
         }
 
-        if (detectedColor != null && !bounds.isEmpty) {
-            overlayView?.highlightText(bounds, detectedColor)
+        if (interventionTriggered && source != null) {
+            source.getBoundsInScreen(bounds)
+            detectedColor?.let { overlayView?.highlightText(bounds, it) }
         } else {
-            if (detectedColor != null) Log.w(TAG, "INTERVENTION ABORTED: Color detected but bounds are EMPTY.")
             overlayView?.clearInterference()
         }
 
         source?.recycle()
+    }
+
+    private fun calculateColorForSeverity(severity: Float): Int {
+        val baseColor = when {
+            severity >= Config.SEVERITY_VISCERAL_THRESHOLD -> Config.SEVERITY_VISCERAL_COLOR
+            severity >= Config.SEVERITY_MODERATE_THRESHOLD -> Config.SEVERITY_MODERATE_COLOR
+            else -> Config.SEVERITY_MILD_COLOR
+        }
+        return baseColor.copy(alpha = 0.8f).value.toInt()
     }
 
     override fun onInterrupt() { overlayView?.clearInterference() }
@@ -141,7 +158,7 @@ class SpiralObserverService : AccessibilityService() {
     private inner class HighlightView(context: Context) : View(context) {
         private val paint = Paint().apply {
             style = Paint.Style.STROKE
-            strokeWidth = 8f // Visible but thin outline
+            strokeWidth = 12f // Slightly thicker for visceral impact
             isAntiAlias = true
         }
         private var targetBounds: Rect? = null
