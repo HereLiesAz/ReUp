@@ -10,16 +10,17 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-// Interrogating the source of truth for versioning
+// Extracting local versioning as a fallback
 val versionProps = Properties().apply {
     val file = rootProject.file("version.properties")
     if (file.exists()) file.inputStream().use { load(it) }
 }
 
-val major = versionProps.getProperty("MAJOR", "0")
-val minor = versionProps.getProperty("MINOR", "0")
-val envVersionName = "$major.$minor.0"
-val envVersionCode = (major.toInt() * 100) + minor.toInt()
+// Prioritizing the CI's "Assembly Line" environment variables
+val envVersionName = System.getenv("VERSION_NAME") 
+    ?: "${versionProps.getProperty("MAJOR", "0")}.${versionProps.getProperty("MINOR", "0")}.0"
+val envVersionCode = System.getenv("VERSION_CODE")?.toInt() 
+    ?: ((versionProps.getProperty("MAJOR", "0").toInt() * 100) + versionProps.getProperty("MINOR", "0").toInt())
 
 android {
     namespace = "com.hereliesaz.reup"
@@ -36,27 +37,17 @@ android {
     buildTypes {
         getByName("debug") {
             isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         getByName("release") {
             isMinifyEnabled = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 
-    buildFeatures {
-        compose = true
-    }
+    buildFeatures { compose = true }
 
-    androidResources {
-        noCompress.add("tflite")
-    }
+    androidResources { noCompress.add("tflite") }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -79,20 +70,16 @@ tasks.register("downloadCortex") {
             println("Awaiting neural network geometry...")
             destDir.mkdirs()
             URI(modelUrl).toURL().openStream().use { input ->
-                FileOutputStream(destFile).use { output ->
-                    input.copyTo(output)
-                }
+                FileOutputStream(destFile).use { output -> input.copyTo(output) }
             }
-            println("Cortex successfully grafted into the panopticon.")
+            println("Cortex successfully grafted.")
         } else {
-            println("The machine already possesses a mind. Skipping assimilation.")
+            println("Mind already exists. Skipping.")
         }
     }
 }
 
-tasks.named("preBuild") {
-    dependsOn("downloadCortex")
-}
+tasks.named("preBuild") { dependsOn("downloadCortex") }
 
 dependencies {
     implementation("androidx.core:core-ktx:1.18.0")
@@ -103,8 +90,6 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
     
-    // LiteRT (TFLite) Task Library for natural language interpretation
-    // Redundant litert-core removed to prevent dependency hallucinations/collisions
     implementation("org.tensorflow:tensorflow-lite-task-text:0.4.4") {
         exclude(group = "org.tensorflow", module = "tensorflow-lite")
         exclude(group = "org.tensorflow", module = "tensorflow-lite-api")
