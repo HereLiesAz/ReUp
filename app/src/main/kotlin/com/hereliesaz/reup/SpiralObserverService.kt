@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
@@ -21,6 +22,7 @@ import kotlinx.coroutines.launch
  */
 class SpiralObserverService : AccessibilityService() {
 
+    private val TAG = "SpiralObserver"
     private var windowManager: WindowManager? = null
     private var overlayView: HighlightView? = null
     private lateinit var dbHelper: SpiralDatabaseHelper
@@ -63,6 +65,9 @@ class SpiralObserverService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
 
+        val eventTypeStr = AccessibilityEvent.eventTypeToString(event.eventType)
+        Log.d(TAG, "Event Received: $eventTypeStr from ${event.packageName}")
+
         // We watch for text changes and window shifts
         if (event.eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED &&
             event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
@@ -72,6 +77,10 @@ class SpiralObserverService : AccessibilityService() {
         val eventText = event.text.joinToString(" ").lowercase()
         val sourceText = source?.text?.toString()?.lowercase() ?: ""
         val fullText = "$eventText $sourceText"
+
+        if (fullText.isNotBlank() && fullText != " ") {
+            Log.v(TAG, "Parsing Text: $fullText")
+        }
 
         val prefs = getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE)
         val activeMask = prefs.getInt(Config.KEY_FILTER_MASK, Config.DEFAULT_MASK)
@@ -83,11 +92,21 @@ class SpiralObserverService : AccessibilityService() {
             if (fullText.contains(trigger)) {
                 val (focus, type, severity) = vectors
 
-                if (Config.isEnabled(activeMask, focus) && Config.isEnabled(activeMask, type)) {
+                val focusEnabled = Config.isEnabled(activeMask, focus)
+                val typeEnabled = Config.isEnabled(activeMask, type)
+                
+                Log.i(TAG, "MATCH: '$trigger' | Focus Enabled: $focusEnabled | Type Enabled: $typeEnabled")
+
+                if (focusEnabled && typeEnabled) {
                     serviceScope.launch { dbHelper.logDistortion(trigger, focus, type) }
 
                     // If we have a source node, get its physical location
-                    source?.getBoundsInScreen(bounds)
+                    if (source != null) {
+                        source.getBoundsInScreen(bounds)
+                        Log.d(TAG, "Highlighting Bounds: $bounds")
+                    } else {
+                        Log.w(TAG, "Source node is NULL for trigger '$trigger'. Highlighting impossible.")
+                    }
 
                     // Bump Alpha to 0xCC (80%) for undeniable visibility
                     val baseColor = when {
@@ -104,6 +123,7 @@ class SpiralObserverService : AccessibilityService() {
         if (detectedColor != null && !bounds.isEmpty) {
             overlayView?.highlightText(bounds, detectedColor)
         } else {
+            if (detectedColor != null) Log.w(TAG, "INTERVENTION ABORTED: Color detected but bounds are EMPTY.")
             overlayView?.clearInterference()
         }
 
