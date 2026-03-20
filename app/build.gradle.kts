@@ -3,17 +3,17 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val envVersionName = System.getenv("VERSION_NAME") ?: "1.0.0.0"
+val envVersionName = System.getenv("VERSION_NAME") ?: "0.3.0.0"
 val envVersionCode = System.getenv("VERSION_CODE")?.toInt() ?: 1
 
 android {
     namespace = "com.hereliesaz.reup"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.hereliesaz.reup"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = envVersionCode
         versionName = envVersionName
     }
@@ -42,7 +42,6 @@ android {
         kotlinCompilerExtensionVersion = "1.5.1"
     }
 
-    // The compiler must not crush the neural network's weights.
     androidResources {
         noCompress.add("tflite")
     }
@@ -65,6 +64,11 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
     
-    // The artificial cortex
-    implementation("org.tensorflow:tensorflow-lite-task-text:0.4.4")
+    // The modern LiteRT engine.
+    implementation("com.google.ai.edge.litert:litert:2.1.0")
+
+    // The artificial cortex wrapper. We amputate the legacy engine and force it to use LiteRT.
+    implementation("org.tensorflow:tensorflow-lite-task-text:0.4.4") {
+        exclude(group = "org.tensorflow", module = "tensorflow-lite")
+    }
 }
