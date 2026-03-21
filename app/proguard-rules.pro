@@ -9,3 +9,7 @@
 -keep public class * extends android.app.Service
 -keep public class * extends android.app.Activity
 -keep public class * extends android.view.View
+
+# TensorFlow Lite
+-keep class org.tensorflow.lite.** { *; }
+-dontwarn org.tensorflow.lite.**
