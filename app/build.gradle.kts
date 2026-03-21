@@ -90,10 +90,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
     
-    implementation("org.tensorflow:tensorflow-lite-task-text:0.4.4") {
-        exclude(group = "org.tensorflow", module = "tensorflow-lite")
-        exclude(group = "org.tensorflow", module = "tensorflow-lite-api")
-    }
+    implementation("org.tensorflow:tensorflow-lite-task-text:0.4.4")
     
     implementation("com.google.auto.value:auto-value-annotations:1.11.1")
 }
