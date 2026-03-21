@@ -23,7 +23,7 @@ jobs:
           java-version: '17'
 
       - name: Setup Gradle Bureaucracy
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Calculate Entropy (a.b.c.d)
         id: version
