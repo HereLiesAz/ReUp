@@ -1,4 +1,4 @@
-// hereliesaz/reup/ReUp-9db2805a9ede9350d55e55d72acf9c1535bb70f4/app/src/main/kotlin/com/hereliesaz/reup/ConfigurationUi.kt
+// app/src/main/kotlin/com/hereliesaz/reup/ConfigurationUi.kt
 
 package com.hereliesaz.reup
 
@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.reup.ui.theme.*
 import com.hereliesaz.reup.SpiralConfig as Config
@@ -28,11 +30,16 @@ import com.hereliesaz.reup.SpiralConfig as Config
 @Composable
 fun SurveillanceConfigurationScreen(context: Context) {
     val prefs = remember { context.getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE) }
-    val dbHelper = remember { SpiralDatabaseHelper(context) }
-    
+
+    val dbHelper = remember { SpiralDatabaseHelper.getInstance(context) }
+
     var currentMask by remember { mutableIntStateOf(prefs.getInt(Config.KEY_FILTER_MASK, Config.DEFAULT_MASK)) }
     var sensitivity by remember { mutableFloatStateOf(prefs.getFloat(Config.KEY_SENSITIVITY, Config.DEFAULT_SENSITIVITY)) }
     var dailyStats by remember { mutableStateOf(emptyList<DailyDistortion>()) }
+
+    // Custom Lexicon State
+    var customPhrases by remember { mutableStateOf(prefs.getStringSet(Config.KEY_CUSTOM_PHRASES, emptySet())?.toList() ?: emptyList()) }
+    var newPhrase by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         dailyStats = dbHelper.getDailyCounts()
@@ -45,6 +52,11 @@ fun SurveillanceConfigurationScreen(context: Context) {
         prefs.edit().putInt(Config.KEY_FILTER_MASK, currentMask).apply()
     }
 
+    fun saveCustomPhrases(phrases: List<String>) {
+        customPhrases = phrases
+        prefs.edit().putStringSet(Config.KEY_CUSTOM_PHRASES, phrases.toSet()).apply()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -55,7 +67,7 @@ fun SurveillanceConfigurationScreen(context: Context) {
             .verticalScroll(scrollState)
     ) {
         Text("CONFIGURATION", style = MaterialTheme.typography.headlineMedium, color = RayGold)
-        
+
         Spacer(modifier = Modifier.height(24.dp))
 
         SectionHeader("ADJUSTABLE PARANOIA")
@@ -66,7 +78,7 @@ fun SurveillanceConfigurationScreen(context: Context) {
         )
         Slider(
             value = sensitivity,
-            onValueChange = { 
+            onValueChange = {
                 sensitivity = it
                 prefs.edit().putFloat(Config.KEY_SENSITIVITY, it).apply()
             },
@@ -80,6 +92,62 @@ fun SurveillanceConfigurationScreen(context: Context) {
         JaggedLineChart(dailyStats)
 
         Spacer(modifier = Modifier.height(24.dp))
+        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+
+        // --- NEW CUSTOM TRIGGERS SECTION ---
+        SectionHeader("CUSTOM TRIGGERS")
+        Text(
+            "Add specific phrases or words for the machine to monitor alongside the neural network.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.6f)
+        )
+
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+            OutlinedTextField(
+                value = newPhrase,
+                onValueChange = { newPhrase = it },
+                modifier = Modifier.weight(1f),
+                textStyle = TextStyle(color = Color.White),
+                placeholder = { Text("e.g., I can't do this", color = Color.White.copy(alpha = 0.4f)) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = RayGold,
+                    unfocusedBorderColor = Color.White.copy(alpha = 0.5f),
+                    cursorColor = RayGold
+                ),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(
+                onClick = {
+                    if (newPhrase.isNotBlank() && !customPhrases.contains(newPhrase.trim())) {
+                        saveCustomPhrases(customPhrases + newPhrase.trim())
+                        newPhrase = ""
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = EyePupilBlue),
+                modifier = Modifier.height(56.dp)
+            ) {
+                Text("ADD", fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        customPhrases.forEach { phrase ->
+            Row(
+                modifier = Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.2f)).padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(phrase, color = RayGold, style = MaterialTheme.typography.bodyLarge)
+                TextButton(onClick = { saveCustomPhrases(customPhrases - phrase) }) {
+                    Text("REMOVE", color = SunRed, fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
         HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
         SectionHeader("FOCUS VECTORS")
@@ -124,7 +192,7 @@ fun JaggedLineChart(data: List<DailyDistortion>) {
             val width = size.width
             val height = size.height
             val spacing = width / (counts.size - 1)
-            
+
             val path = Path().apply {
                 counts.forEachIndexed { index, count ->
                     val x = index * spacing
@@ -134,7 +202,7 @@ fun JaggedLineChart(data: List<DailyDistortion>) {
             }
 
             drawPath(path = path, color = RayGold, style = Stroke(width = 4f))
-            
+
             counts.forEachIndexed { index, count ->
                 val x = index * spacing
                 val y = height - (count / maxCount * height)

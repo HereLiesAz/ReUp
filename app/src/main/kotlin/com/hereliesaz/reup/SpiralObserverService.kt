@@ -1,13 +1,15 @@
-// hereliesaz/reup/ReUp-c714b8692ef249c9d91ed57a33a63f43f5c8c59d/app/src/main/kotlin/com/hereliesaz/reup/SpiralObserverService.kt
+// app/src/main/kotlin/com/hereliesaz/reup/SpiralObserverService.kt
 
 package com.hereliesaz.reup
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color as AndroidColor
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
@@ -15,6 +17,10 @@ import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
 import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.reup.SpiralConfig as Config
 import kotlinx.coroutines.CoroutineScope
@@ -32,6 +38,9 @@ import org.tensorflow.lite.task.text.nlclassifier.NLClassifier
  * Cartesian disconnect resolved via geometric relativity.
  * Recursive node excavation implemented.
  * IPC traffic jam resolved via temporal debouncing (400ms).
+ * ACTIVE INTERVENTION PROTOCOL (Text Replacement) INITIATED.
+ * CUSTOM LEXICON SUPPORT ADDED.
+ * PASSIVE AFFIRMATION LOOP INITIATED.
  */
 class SpiralObserverService : AccessibilityService() {
 
@@ -40,7 +49,7 @@ class SpiralObserverService : AccessibilityService() {
     private var overlayView: HighlightView? = null
     private lateinit var dbHelper: SpiralDatabaseHelper
     private val serviceScope = CoroutineScope(Dispatchers.IO)
-    
+
     // The machine's actual cortex
     private var classifier: NLClassifier? = null
 
@@ -49,6 +58,24 @@ class SpiralObserverService : AccessibilityService() {
     private var cachedTargetText: String = ""
     private var cachedColor: Int? = null
     private var interrogationJob: Job? = null
+
+    // Active Intervention Views
+    private var touchTargetView: View? = null
+    private var suggestionsPopupView: View? = null
+
+    // --- NEW: Affirmation Tracking State ---
+    private var currentPackageName: CharSequence? = null
+    private var ignoreCount = 0
+    private var affirmationJob: Job? = null
+    private val affirmations = listOf(
+        "You are stronger than this moment.",
+        "Take a deep breath. You've got this.",
+        "Be kind to yourself.",
+        "Every step forward counts.",
+        "You are worthy of grace.",
+        "Progress, not perfection.",
+        "It's okay to feel this way, but don't stay here."
+    )
 
     // Fallback/Override lexicon for high-certainty specific vectors
     private val spiralLexicon = mapOf(
@@ -63,7 +90,8 @@ class SpiralObserverService : AccessibilityService() {
         super.onServiceConnected()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         overlayView = HighlightView(this)
-        dbHelper = SpiralDatabaseHelper(this)
+
+        dbHelper = SpiralDatabaseHelper.getInstance(this)
 
         try {
             classifier = NLClassifier.createFromFile(this, "sentiment_classifier.tflite")
@@ -97,9 +125,9 @@ class SpiralObserverService : AccessibilityService() {
 
         val eventType = event.eventType
 
-        if (eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED || 
+        if (eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED ||
             eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
-            
+
             cachedTargetNode?.let { node ->
                 if (node.refresh()) {
                     updateVisualIntervention(node, cachedTargetText, cachedColor!!)
@@ -114,8 +142,15 @@ class SpiralObserverService : AccessibilityService() {
         if (eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED &&
             eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
 
+        // --- NEW: Track the active app to reset the Affirmation loop if you switch apps ---
+        val packageName = event.packageName
+        if (packageName != null && packageName != currentPackageName) {
+            currentPackageName = packageName
+            resetAffirmationState()
+        }
+
         val source = event.source ?: return
-        
+
         val eventText = event.text.joinToString(" ").lowercase()
         val sourceText = source.text?.toString()?.lowercase() ?: ""
         val fullText = sourceText.ifBlank { eventText }.trim()
@@ -129,38 +164,48 @@ class SpiralObserverService : AccessibilityService() {
         val prefs = getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE)
         val activeMask = prefs.getInt(Config.KEY_FILTER_MASK, Config.DEFAULT_MASK)
         val sensitivity = prefs.getFloat(Config.KEY_SENSITIVITY, Config.DEFAULT_SENSITIVITY)
+        val customPhrases = prefs.getStringSet(Config.KEY_CUSTOM_PHRASES, emptySet()) ?: emptySet()
 
-        // The user is actively expressing themselves. 
-        // Cancel the previous interrogation to prevent IPC suffocation.
         interrogationJob?.cancel()
-
-        // Clone the source node synchronously. 
-        // The OS will ruthlessly recycle the original before the coroutine wakes up.
         val safeSource = AccessibilityNodeInfo.obtain(source)
         source.recycle()
 
         interrogationJob = serviceScope.launch {
             try {
-                // The Machine waits for a breath (400ms) before judging.
-                delay(400)
-                
+                delay(400) // Debounce breath
+
                 var interventionTriggered = false
                 var detectedColor: Int? = null
-                var targetText = fullText 
+                var targetText = fullText
 
+                // 1. NEURAL NETWORK EVALUATION
                 classifier?.let { cortex ->
                     val results = cortex.classify(fullText)
                     val despairScore = results.find { it.label.equals("Negative", ignoreCase = true) }?.score ?: 0f
-                    
+
                     if (despairScore >= sensitivity) {
-                        if (Config.isEnabled(activeMask, Config.FOCUS_SELF) && Config.isEnabled(activeMask, Config.TYPE_DESPAIR)) {
+                        val activeFocus = when {
+                            Config.isEnabled(activeMask, Config.FOCUS_SELF) -> Config.FOCUS_SELF
+                            Config.isEnabled(activeMask, Config.FOCUS_OTHERS) -> Config.FOCUS_OTHERS
+                            Config.isEnabled(activeMask, Config.FOCUS_WORLD) -> Config.FOCUS_WORLD
+                            else -> 0
+                        }
+                        val activeType = when {
+                            Config.isEnabled(activeMask, Config.TYPE_DESPAIR) -> Config.TYPE_DESPAIR
+                            Config.isEnabled(activeMask, Config.TYPE_WORTHLESS) -> Config.TYPE_WORTHLESS
+                            Config.isEnabled(activeMask, Config.TYPE_ANGER) -> Config.TYPE_ANGER
+                            else -> 0
+                        }
+
+                        if (activeFocus != 0 || activeType != 0) {
                             interventionTriggered = true
-                            dbHelper.logDistortion(fullText.take(50), Config.FOCUS_SELF, Config.TYPE_DESPAIR)
+                            dbHelper.logDistortion(fullText.take(50), activeFocus, activeType)
                             detectedColor = calculateColorForSeverity(despairScore)
                         }
                     }
                 }
 
+                // 2. HARDCODED LEXICON EVALUATION
                 if (!interventionTriggered) {
                     for ((trigger, vectors) in spiralLexicon) {
                         if (fullText.contains(trigger)) {
@@ -176,16 +221,39 @@ class SpiralObserverService : AccessibilityService() {
                     }
                 }
 
+                // 3. CUSTOM LEXICON EVALUATION
+                if (!interventionTriggered && customPhrases.isNotEmpty()) {
+                    for (phrase in customPhrases) {
+                        if (fullText.contains(phrase, ignoreCase = true)) {
+                            interventionTriggered = true
+                            targetText = phrase
+                            dbHelper.logDistortion(phrase, Config.FOCUS_SELF, Config.TYPE_DESPAIR)
+                            detectedColor = calculateColorForSeverity(0.6f)
+                            break
+                        }
+                    }
+                }
+
                 withContext(Dispatchers.Main) {
                     if (interventionTriggered && detectedColor != null) {
                         clearCachedIntervention()
-                        
+
+                        if (!safeSource.refresh()) {
+                            clearCachedIntervention()
+                            return@withContext
+                        }
+
                         val preciseNode = findDeepestNodeWithText(safeSource, targetText) ?: AccessibilityNodeInfo.obtain(safeSource)
-                        
+
+                        if (!preciseNode.refresh()) {
+                            clearCachedIntervention()
+                            return@withContext
+                        }
+
                         cachedTargetNode = preciseNode
                         cachedTargetText = targetText
                         cachedColor = detectedColor
-                        
+
                         updateVisualIntervention(preciseNode, targetText, detectedColor!!)
                     } else {
                         clearCachedIntervention()
@@ -199,19 +267,17 @@ class SpiralObserverService : AccessibilityService() {
 
     private fun findDeepestNodeWithText(root: AccessibilityNodeInfo?, target: String): AccessibilityNodeInfo? {
         if (root == null || target.isBlank()) return null
-        
         var match: AccessibilityNodeInfo? = null
         val nodeText = root.text?.toString()?.lowercase() ?: root.contentDescription?.toString()?.lowercase() ?: ""
-        
+
         if (nodeText.contains(target) || (target.length > 5 && target.contains(nodeText) && nodeText.isNotBlank())) {
             match = AccessibilityNodeInfo.obtain(root)
         }
-        
         for (i in 0 until root.childCount) {
             val child = root.getChild(i)
             val childMatch = findDeepestNodeWithText(child, target)
             if (childMatch != null) {
-                match?.recycle() 
+                match?.recycle()
                 match = childMatch
             }
             child?.recycle()
@@ -230,9 +296,9 @@ class SpiralObserverService : AccessibilityService() {
                 putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_START_INDEX, startIndex)
                 putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_LENGTH, targetText.length)
             }
-            
+
             val success = node.refreshWithExtraData(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY, args)
-            
+
             if (success && node.extras != null) {
                 val parcelables = node.extras.getParcelableArray(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY)
                 if (parcelables != null && parcelables.isNotEmpty()) {
@@ -252,12 +318,170 @@ class SpiralObserverService : AccessibilityService() {
         if (!precisionAchieved) {
             node.getBoundsInScreen(bounds)
         }
-        
+
         if (bounds.isEmpty) {
-            overlayView?.clearInterference()
+            clearCachedIntervention()
         } else {
             overlayView?.highlightText(bounds, color)
+            showTouchTarget(bounds)
         }
+    }
+
+    // --- ACTIVE INTERVENTION & AFFIRMATION PROTOCOL ---
+
+    private fun showTouchTarget(bounds: Rect) {
+        removeTouchTarget()
+
+        touchTargetView = View(this).apply {
+            setOnClickListener { showSuggestionsPopup(bounds) }
+        }
+
+        val params = WindowManager.LayoutParams(
+            bounds.width(),
+            bounds.height(),
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = bounds.left
+            y = bounds.top
+        }
+
+        try { windowManager?.addView(touchTargetView, params) }
+        catch (e: Exception) { Log.e(TAG, "Failed to project touch target.") }
+    }
+
+    private fun showSuggestionsPopup(bounds: Rect) {
+        removeTouchTarget()
+        removeSuggestionsPopup()
+
+        val context = this
+        val layout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 32, 32, 32)
+            background = GradientDrawable().apply {
+                setColor(AndroidColor.parseColor("#F21A1A24")) // Opaque SkyIndigo
+                cornerRadius = 24f
+                setStroke(4, AndroidColor.parseColor("#FDBE31")) // RayGold Border
+            }
+        }
+
+        layout.addView(TextView(context).apply {
+            text = "REPHRASE PROTOCOL"
+            setTextColor(AndroidColor.parseColor("#FDBE31"))
+            textSize = 12f
+            setPadding(0, 0, 0, 24)
+            gravity = Gravity.CENTER
+        })
+
+        val suggestions = getAlternativesFor(cachedTargetText)
+        suggestions.forEach { suggestion ->
+            val btn = Button(context).apply {
+                text = suggestion
+                setTextColor(AndroidColor.WHITE)
+                isAllCaps = false
+                background = GradientDrawable().apply {
+                    setColor(AndroidColor.parseColor("#99C93F2B")) // Visceral Red
+                    cornerRadius = 16f
+                }
+                setOnClickListener { applySuggestion(suggestion) }
+            }
+            layout.addView(btn)
+            (btn.layoutParams as LinearLayout.LayoutParams).setMargins(0, 0, 0, 16)
+        }
+
+        layout.addView(Button(context).apply {
+            text = "IGNORE"
+            setTextColor(AndroidColor.GRAY)
+            setBackgroundColor(AndroidColor.TRANSPARENT)
+            // --- NEW: Triggers the Ignore handler instead of just clearing ---
+            setOnClickListener { handleIgnore() }
+        })
+
+        suggestionsPopupView = layout
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = bounds.left
+            y = bounds.bottom + 20
+        }
+
+        try { windowManager?.addView(suggestionsPopupView, params) }
+        catch (e: Exception) { Log.e(TAG, "Failed to project intervention popup.") }
+    }
+
+    private fun getAlternativesFor(text: String): List<String> {
+        return when (text.lowercase()) {
+            "pointless" -> listOf("challenging", "a learning step", "meaningful")
+            "hate" -> listOf("struggle with", "dislike", "am navigating")
+            "worthless" -> listOf("valuable", "still growing", "worthy")
+            "failure" -> listOf("setback", "stepping stone", "lesson")
+            "give up" -> listOf("take a break", "keep trying", "ask for help")
+            else -> listOf("This is hard but I can manage", "I need a moment", "I'm working through this")
+        }
+    }
+
+    private fun applySuggestion(suggestion: String) {
+        cachedTargetNode?.let { node ->
+            val currentText = node.text?.toString() ?: ""
+            val newText = currentText.replace(cachedTargetText, suggestion, ignoreCase = true)
+
+            val args = Bundle().apply {
+                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, newText)
+            }
+            node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+        }
+
+        // --- NEW: Reward the user by resetting the Affirmation loop ---
+        resetAffirmationState()
+        clearCachedIntervention()
+    }
+
+    // --- NEW: Affirmation Logic ---
+
+    private fun handleIgnore() {
+        ignoreCount++
+        clearCachedIntervention()
+
+        // If they have ignored the machine 2 times, start the support loop
+        if (ignoreCount >= 2 && (affirmationJob == null || affirmationJob?.isActive != true)) {
+            startAffirmationLoop()
+        }
+    }
+
+    private fun startAffirmationLoop() {
+        affirmationJob = serviceScope.launch(Dispatchers.Main) {
+            while (true) {
+                // Wait 20 seconds between gentle reminders
+                delay(20000)
+                Toast.makeText(this@SpiralObserverService, affirmations.random(), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun resetAffirmationState() {
+        ignoreCount = 0
+        affirmationJob?.cancel()
+        affirmationJob = null
+    }
+
+    // --- UI Cleanup ---
+
+    private fun removeTouchTarget() {
+        touchTargetView?.let { windowManager?.removeView(it) }
+        touchTargetView = null
+    }
+
+    private fun removeSuggestionsPopup() {
+        suggestionsPopupView?.let { windowManager?.removeView(it) }
+        suggestionsPopupView = null
     }
 
     private fun clearCachedIntervention() {
@@ -266,6 +490,8 @@ class SpiralObserverService : AccessibilityService() {
         cachedTargetText = ""
         cachedColor = null
         overlayView?.clearInterference()
+        removeTouchTarget()
+        removeSuggestionsPopup()
     }
 
     private fun calculateColorForSeverity(severity: Float): Int {
@@ -274,13 +500,14 @@ class SpiralObserverService : AccessibilityService() {
             severity >= Config.SEVERITY_MODERATE_THRESHOLD -> Config.SEVERITY_MODERATE_COLOR
             else -> Config.SEVERITY_MILD_COLOR
         }
-        return baseColor.copy(alpha = 0.8f).toArgb()
+        return baseColor.toArgb()
     }
 
     override fun onInterrupt() { clearCachedIntervention() }
 
     override fun onDestroy() {
         super.onDestroy()
+        resetAffirmationState()
         serviceScope.cancel()
         clearCachedIntervention()
         overlayView?.let { windowManager?.removeView(it) }
@@ -288,14 +515,11 @@ class SpiralObserverService : AccessibilityService() {
     }
 
     private inner class HighlightView(context: Context) : View(context) {
-        
-        init {
-            setWillNotDraw(false)
-        }
-        
+        init { setWillNotDraw(false) }
+
         private val paint = Paint().apply {
             style = Paint.Style.STROKE
-            strokeWidth = 4f
+            strokeWidth = 6f
             isAntiAlias = true
         }
         private var targetBounds: Rect? = null
@@ -303,14 +527,13 @@ class SpiralObserverService : AccessibilityService() {
 
         fun highlightText(bounds: Rect, color: Int) {
             isInterfering = true
-            
             val screenOffset = IntArray(2)
             getLocationOnScreen(screenOffset)
-            
+
             targetBounds = Rect(bounds).apply {
                 offset(-screenOffset[0], -screenOffset[1])
             }
-            
+
             paint.color = color
             invalidate()
         }

@@ -1,4 +1,4 @@
-// hereliesaz/reup/ReUp-c714b8692ef249c9d91ed57a33a63f43f5c8c59d/app/src/main/kotlin/com/hereliesaz/reup/SpiralDatabaseHelper.kt
+// app/src/main/kotlin/com/hereliesaz/reup/SpiralDatabaseHelper.kt
 
 package com.hereliesaz.reup
 
@@ -22,7 +22,7 @@ data class DailyDistortion(
     val count: Int
 )
 
-class SpiralDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+class SpiralDatabaseHelper private constructor(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
     companion object {
         private const val DATABASE_NAME = "spiral_ledger.db"
@@ -32,8 +32,20 @@ class SpiralDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABAS
         const val COL_ID = "id"
         const val COL_TEXT = "distortion_text"
         const val COL_TIMESTAMP = "timestamp"
-        const val COL_FOCUS_FLAG = "focus_flag" // NEW column
-        const val COL_TYPE_FLAG = "type_flag"   // NEW column
+        const val COL_FOCUS_FLAG = "focus_flag"
+        const val COL_TYPE_FLAG = "type_flag"
+
+        // Singleton implementation prevents Database connection leaks
+        @Volatile
+        private var INSTANCE: SpiralDatabaseHelper? = null
+
+        fun getInstance(context: Context): SpiralDatabaseHelper {
+            return INSTANCE ?: synchronized(this) {
+                val instance = SpiralDatabaseHelper(context.applicationContext)
+                INSTANCE = instance
+                instance
+            }
+        }
     }
 
     override fun onCreate(db: SQLiteDatabase?) {
@@ -67,30 +79,30 @@ class SpiralDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABAS
             put(COL_TYPE_FLAG, typeFlag)
         }
         db.insert(TABLE_LEDGER, null, values)
-        // db.close() excised. The machine must not suffocate its own threads.
+        // Singleton keeps the connection alive safely.
     }
 
     /**
      * Aggregates the history of your cognitive collapses by day,
-     * now tethered to local temporal reality.
+     * safely utilizing memory block closures for cursor management.
      */
     fun getDailyCounts(): List<DailyDistortion> {
         val list = mutableListOf<DailyDistortion>()
         val db = readableDatabase
-        
+
         // Appended 'localtime' to prevent UTC temporal drift.
         val query = "SELECT date(timestamp / 1000, 'unixepoch', 'localtime') as day, count(*) as cnt FROM $TABLE_LEDGER GROUP BY day ORDER BY day ASC LIMIT 7"
-        val cursor = db.rawQuery(query, null)
-        
-        if (cursor.moveToFirst()) {
-            do {
-                val day = cursor.getString(0) ?: "Unknown"
-                val count = cursor.getInt(1)
-                list.add(DailyDistortion(day, count))
-            } while (cursor.moveToNext())
+
+        // The '.use' block guarantees the cursor closes automatically, eliminating leaks.
+        db.rawQuery(query, null).use { cursor ->
+            if (cursor.moveToFirst()) {
+                do {
+                    val day = cursor.getString(0) ?: "Unknown"
+                    val count = cursor.getInt(1)
+                    list.add(DailyDistortion(day, count))
+                } while (cursor.moveToNext())
+            }
         }
-        cursor.close()
-        // db.close() excised. Let the lifecycle handle the burial.
         return list
     }
 }

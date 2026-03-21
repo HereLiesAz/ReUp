@@ -1,4 +1,4 @@
-// hereliesaz/reup/ReUp-9db2805a9ede9350d55e55d72acf9c1535bb70f4/app/src/main/kotlin/com/hereliesaz/reup/SpiralConfig.kt
+// app/src/main/kotlin/com/hereliesaz/reup/SpiralConfig.kt
 
 package com.hereliesaz.reup
 
@@ -6,13 +6,16 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * The geometrical constants of your configured despair.
- * Now expanded to govern the neural network's sensitivity threshold.
+ * Now expanded to govern the neural network's sensitivity threshold and custom lexicons.
  */
 object SpiralConfig {
 
     const val PREFS_NAME = "ReUpSurveillancePrefs"
     const val KEY_FILTER_MASK = "surveillance_filter_mask"
-    
+
+    // Custom phrases defined by the user
+    const val KEY_CUSTOM_PHRASES = "surveillance_custom_phrases"
+
     // Adjustable Paranoia: The sensitivity of the NLClassifier (0.0 to 1.0)
     const val KEY_SENSITIVITY = "surveillance_sensitivity"
     const val DEFAULT_SENSITIVITY = 0.5f
