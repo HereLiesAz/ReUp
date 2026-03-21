@@ -41,6 +41,9 @@ fun SurveillanceConfigurationScreen(context: Context) {
     var customPhrases by remember { mutableStateOf(prefs.getStringSet(Config.KEY_CUSTOM_PHRASES, emptySet())?.toList() ?: emptyList()) }
     var newPhrase by remember { mutableStateOf("") }
 
+    // Test Terminal State
+    var testText by remember { mutableStateOf("") }
+
     LaunchedEffect(Unit) {
         dailyStats = dbHelper.getDailyCounts()
     }
@@ -94,7 +97,7 @@ fun SurveillanceConfigurationScreen(context: Context) {
         Spacer(modifier = Modifier.height(24.dp))
         HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
-        // --- NEW CUSTOM TRIGGERS SECTION ---
+        // --- CUSTOM TRIGGERS SECTION ---
         SectionHeader("CUSTOM TRIGGERS")
         Text(
             "Add specific phrases or words for the machine to monitor alongside the neural network.",
@@ -163,6 +166,30 @@ fun SurveillanceConfigurationScreen(context: Context) {
         ConfigCheckbox("DESPAIR", Config.isEnabled(currentMask, Config.TYPE_DESPAIR), checkColors) { updateMask(Config.TYPE_DESPAIR) }
         ConfigCheckbox("WORTHLESS", Config.isEnabled(currentMask, Config.TYPE_WORTHLESS), checkColors) { updateMask(Config.TYPE_WORTHLESS) }
         ConfigCheckbox("ANGER", Config.isEnabled(currentMask, Config.TYPE_ANGER), checkColors) { updateMask(Config.TYPE_ANGER) }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+
+        // --- NEW TEST TERMINAL SECTION ---
+        SectionHeader("CALIBRATION TERMINAL")
+        Text(
+            "Test the machine's neural thresholds and custom triggers safely within the app.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.6f),
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        OutlinedTextField(
+            value = testText,
+            onValueChange = { testText = it },
+            modifier = Modifier.fillMaxWidth().height(120.dp),
+            textStyle = TextStyle(color = Color.White),
+            placeholder = { Text("Try some negativity! Just to see how it works...", color = Color.White.copy(alpha = 0.4f)) },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = RayGold,
+                unfocusedBorderColor = Color.White.copy(alpha = 0.5f),
+                cursorColor = RayGold
+            )
+        )
 
         Spacer(modifier = Modifier.height(64.dp))
     }
