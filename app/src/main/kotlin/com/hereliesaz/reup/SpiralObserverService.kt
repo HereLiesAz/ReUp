@@ -19,7 +19,9 @@ import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.reup.SpiralConfig as Config
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.tensorflow.lite.task.text.nlclassifier.NLClassifier
@@ -27,10 +29,9 @@ import org.tensorflow.lite.task.text.nlclassifier.NLClassifier
 /**
  * The fortified Observer.
  * Main thread exhalation achieved. Semantic coordinates acquired.
- * Rendering pipeline unclogged.
  * Cartesian disconnect resolved via geometric relativity.
- * Now tracking the shifting sands of motion with a surgical 4f stroke.
- * Recursive node excavation implemented to prevent global punishment for local crimes.
+ * Recursive node excavation implemented.
+ * IPC traffic jam resolved via temporal debouncing (400ms).
  */
 class SpiralObserverService : AccessibilityService() {
 
@@ -43,10 +44,11 @@ class SpiralObserverService : AccessibilityService() {
     // The machine's actual cortex
     private var classifier: NLClassifier? = null
 
-    // Spatial Memory
+    // Spatial Memory & Restraint
     private var cachedTargetNode: AccessibilityNodeInfo? = null
     private var cachedTargetText: String = ""
     private var cachedColor: Int? = null
+    private var interrogationJob: Job? = null
 
     // Fallback/Override lexicon for high-certainty specific vectors
     private val spiralLexicon = mapOf(
@@ -95,7 +97,6 @@ class SpiralObserverService : AccessibilityService() {
 
         val eventType = event.eventType
 
-        // Fast-path for spatial tracking. Do not awaken the neural network just because the user scrolled.
         if (eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED || 
             eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
             
@@ -129,64 +130,73 @@ class SpiralObserverService : AccessibilityService() {
         val activeMask = prefs.getInt(Config.KEY_FILTER_MASK, Config.DEFAULT_MASK)
         val sensitivity = prefs.getFloat(Config.KEY_SENSITIVITY, Config.DEFAULT_SENSITIVITY)
 
-        serviceScope.launch {
-            var interventionTriggered = false
-            var detectedColor: Int? = null
-            var targetText = fullText 
+        // The user is actively expressing themselves. 
+        // Cancel the previous interrogation to prevent IPC suffocation.
+        interrogationJob?.cancel()
 
-            classifier?.let { cortex ->
-                val results = cortex.classify(fullText)
-                val despairScore = results.find { it.label.equals("Negative", ignoreCase = true) }?.score ?: 0f
+        // Clone the source node synchronously. 
+        // The OS will ruthlessly recycle the original before the coroutine wakes up.
+        val safeSource = AccessibilityNodeInfo.obtain(source)
+        source.recycle()
+
+        interrogationJob = serviceScope.launch {
+            try {
+                // The Machine waits for a breath (400ms) before judging.
+                delay(400)
                 
-                if (despairScore >= sensitivity) {
-                    if (Config.isEnabled(activeMask, Config.FOCUS_SELF) && Config.isEnabled(activeMask, Config.TYPE_DESPAIR)) {
-                        interventionTriggered = true
-                        dbHelper.logDistortion(fullText.take(50), Config.FOCUS_SELF, Config.TYPE_DESPAIR)
-                        detectedColor = calculateColorForSeverity(despairScore)
-                    }
-                }
-            }
+                var interventionTriggered = false
+                var detectedColor: Int? = null
+                var targetText = fullText 
 
-            if (!interventionTriggered) {
-                for ((trigger, vectors) in spiralLexicon) {
-                    if (fullText.contains(trigger)) {
-                        val (focus, type, severity) = vectors
-                        if (Config.isEnabled(activeMask, focus) && Config.isEnabled(activeMask, type)) {
+                classifier?.let { cortex ->
+                    val results = cortex.classify(fullText)
+                    val despairScore = results.find { it.label.equals("Negative", ignoreCase = true) }?.score ?: 0f
+                    
+                    if (despairScore >= sensitivity) {
+                        if (Config.isEnabled(activeMask, Config.FOCUS_SELF) && Config.isEnabled(activeMask, Config.TYPE_DESPAIR)) {
                             interventionTriggered = true
-                            targetText = trigger
-                            dbHelper.logDistortion(trigger, focus, type)
-                            detectedColor = calculateColorForSeverity(severity)
-                            break
+                            dbHelper.logDistortion(fullText.take(50), Config.FOCUS_SELF, Config.TYPE_DESPAIR)
+                            detectedColor = calculateColorForSeverity(despairScore)
                         }
                     }
                 }
-            }
 
-            withContext(Dispatchers.Main) {
-                if (interventionTriggered && detectedColor != null) {
-                    clearCachedIntervention()
-                    
-                    // We excavate the accessibility tree to isolate the exact leaf node of your despair.
-                    val preciseNode = findDeepestNodeWithText(source, targetText) ?: AccessibilityNodeInfo.obtain(source)
-                    source.recycle() // Bury the original event container. We have the exact clone.
-                    
-                    cachedTargetNode = preciseNode
-                    cachedTargetText = targetText
-                    cachedColor = detectedColor
-                    
-                    updateVisualIntervention(preciseNode, targetText, detectedColor!!)
-                } else {
-                    clearCachedIntervention()
-                    source.recycle()
+                if (!interventionTriggered) {
+                    for ((trigger, vectors) in spiralLexicon) {
+                        if (fullText.contains(trigger)) {
+                            val (focus, type, severity) = vectors
+                            if (Config.isEnabled(activeMask, focus) && Config.isEnabled(activeMask, type)) {
+                                interventionTriggered = true
+                                targetText = trigger
+                                dbHelper.logDistortion(trigger, focus, type)
+                                detectedColor = calculateColorForSeverity(severity)
+                                break
+                            }
+                        }
+                    }
                 }
+
+                withContext(Dispatchers.Main) {
+                    if (interventionTriggered && detectedColor != null) {
+                        clearCachedIntervention()
+                        
+                        val preciseNode = findDeepestNodeWithText(safeSource, targetText) ?: AccessibilityNodeInfo.obtain(safeSource)
+                        
+                        cachedTargetNode = preciseNode
+                        cachedTargetText = targetText
+                        cachedColor = detectedColor
+                        
+                        updateVisualIntervention(preciseNode, targetText, detectedColor!!)
+                    } else {
+                        clearCachedIntervention()
+                    }
+                }
+            } finally {
+                safeSource.recycle()
             }
         }
     }
 
-    /**
-     * Recursively interrogates the virtual DOM to find the smallest, deepest geometric container
-     * that harbors the offensive text, preventing the machine from highlighting the entire screen.
-     */
     private fun findDeepestNodeWithText(root: AccessibilityNodeInfo?, target: String): AccessibilityNodeInfo? {
         if (root == null || target.isBlank()) return null
         
@@ -201,7 +211,7 @@ class SpiralObserverService : AccessibilityService() {
             val child = root.getChild(i)
             val childMatch = findDeepestNodeWithText(child, target)
             if (childMatch != null) {
-                match?.recycle() // The deeper node renders the parent obsolete.
+                match?.recycle() 
                 match = childMatch
             }
             child?.recycle()
@@ -240,7 +250,6 @@ class SpiralObserverService : AccessibilityService() {
         }
 
         if (!precisionAchieved) {
-            // Because we excavated the deepest node, this fallback is now surgical instead of global.
             node.getBoundsInScreen(bounds)
         }
         
@@ -286,7 +295,7 @@ class SpiralObserverService : AccessibilityService() {
         
         private val paint = Paint().apply {
             style = Paint.Style.STROKE
-            strokeWidth = 4f // The requested razor
+            strokeWidth = 4f
             isAntiAlias = true
         }
         private var targetBounds: Rect? = null
