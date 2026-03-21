@@ -22,26 +22,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.reup.ui.theme.*
 import com.hereliesaz.reup.SpiralConfig as Config
+import java.io.File
 
 /**
  * The command center for your surveillance.
- * The illusion of choice has been corrected.
+ * The faulty Paranoia Slider has been excised.
+ * Text file I/O integrated for Custom Triggers.
  */
 @Composable
 fun SurveillanceConfigurationScreen(context: Context) {
     val prefs = remember { context.getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE) }
-
     val dbHelper = remember { SpiralDatabaseHelper.getInstance(context) }
 
     var currentMask by remember { mutableIntStateOf(prefs.getInt(Config.KEY_FILTER_MASK, Config.DEFAULT_MASK)) }
-    var sensitivity by remember { mutableFloatStateOf(prefs.getFloat(Config.KEY_SENSITIVITY, Config.DEFAULT_SENSITIVITY)) }
     var dailyStats by remember { mutableStateOf(emptyList<DailyDistortion>()) }
 
-    // Custom Lexicon State
-    var customPhrases by remember { mutableStateOf(prefs.getStringSet(Config.KEY_CUSTOM_PHRASES, emptySet())?.toList() ?: emptyList()) }
-    var newPhrase by remember { mutableStateOf("") }
+    // --- NEW: Text File Integration ---
+    val triggersFile = remember { File(context.filesDir, Config.FILE_CUSTOM_PHRASES) }
 
-    // Test Terminal State
+    var customPhrases by remember {
+        mutableStateOf(
+            if (triggersFile.exists()) triggersFile.readLines().filter { it.isNotBlank() }
+            else emptyList()
+        )
+    }
+
+    var newPhrase by remember { mutableStateOf("") }
     var testText by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
@@ -55,9 +61,10 @@ fun SurveillanceConfigurationScreen(context: Context) {
         prefs.edit().putInt(Config.KEY_FILTER_MASK, currentMask).apply()
     }
 
+    // --- NEW: Writes directly to the .txt file on the device ---
     fun saveCustomPhrases(phrases: List<String>) {
         customPhrases = phrases
-        prefs.edit().putStringSet(Config.KEY_CUSTOM_PHRASES, phrases.toSet()).apply()
+        triggersFile.writeText(phrases.joinToString("\n"))
     }
 
     Column(
@@ -73,32 +80,19 @@ fun SurveillanceConfigurationScreen(context: Context) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        SectionHeader("ADJUSTABLE PARANOIA")
-        Text(
-            "Neural sensitivity threshold ($sensitivity). Lower values invite more interference.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Color.White.copy(alpha = 0.6f)
-        )
-        Slider(
-            value = sensitivity,
-            onValueChange = {
-                sensitivity = it
-                prefs.edit().putFloat(Config.KEY_SENSITIVITY, it).apply()
-            },
-            colors = SliderDefaults.colors(thumbColor = SunRed, activeTrackColor = RayGold)
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-
         SectionHeader("THE JAGGED VOID (Despair Analytics)")
         JaggedLineChart(dailyStats)
 
         Spacer(modifier = Modifier.height(24.dp))
         HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
-        // --- CUSTOM TRIGGERS SECTION ---
         SectionHeader("CUSTOM TRIGGERS")
+        Text(
+            "Saved to: ${triggersFile.absolutePath}",
+            style = MaterialTheme.typography.labelSmall,
+            color = EyePupilBlue,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
         Text(
             "Add specific phrases or words for the machine to monitor alongside the neural network.",
             style = MaterialTheme.typography.bodySmall,
@@ -170,7 +164,6 @@ fun SurveillanceConfigurationScreen(context: Context) {
         Spacer(modifier = Modifier.height(24.dp))
         HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
-        // --- NEW TEST TERMINAL SECTION ---
         SectionHeader("CALIBRATION TERMINAL")
         Text(
             "Test the machine's neural thresholds and custom triggers safely within the app.",

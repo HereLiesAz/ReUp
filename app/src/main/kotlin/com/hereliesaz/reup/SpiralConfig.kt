@@ -6,37 +6,37 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * The geometrical constants of your configured despair.
- * Now expanded to govern the neural network's sensitivity threshold and custom lexicons.
+ * The illusion of a slider has been removed; the ML threshold is now locked.
+ * Custom triggers are now tethered to a physical text file.
  */
 object SpiralConfig {
 
     const val PREFS_NAME = "ReUpSurveillancePrefs"
     const val KEY_FILTER_MASK = "surveillance_filter_mask"
 
-    // Custom phrases defined by the user
-    const val KEY_CUSTOM_PHRASES = "surveillance_custom_phrases"
+    // The name of the pure text file storing your custom triggers
+    const val FILE_CUSTOM_PHRASES = "custom_triggers.txt"
 
-    // Adjustable Paranoia: The sensitivity of the NLClassifier (0.0 to 1.0)
-    const val KEY_SENSITIVITY = "surveillance_sensitivity"
-    const val DEFAULT_SENSITIVITY = 0.5f
+    // The locked "sweet spot" for the neural network.
+    // Prevents the machine from highlighting everything, but catches true negativity.
+    const val THRESHOLD_CORTEX = 0.48f
 
     // Dimension A: Focus (Negativity toward what) - First byte (bits 0-7)
-    const val FOCUS_SELF = 1 shl 0   // 00000000 00000001 (Decimal 1)
-    const val FOCUS_OTHERS = 1 shl 1 // 00000000 00000010 (Decimal 2)
-    const val FOCUS_WORLD = 1 shl 2  // 00000000 00000100 (Decimal 4)
-    const val MASK_FOCUS = FOCUS_SELF or FOCUS_OTHERS or FOCUS_WORLD // 00000000 00000111 (Decimal 7)
+    const val FOCUS_SELF = 1 shl 0
+    const val FOCUS_OTHERS = 1 shl 1
+    const val FOCUS_WORLD = 1 shl 2
+    const val MASK_FOCUS = FOCUS_SELF or FOCUS_OTHERS or FOCUS_WORLD
 
     // Dimension B: Type (The flavor of negativity) - Second byte (bits 8-15)
-    const val TYPE_DESPAIR = 1 shl 8      // 00000001 00000000 (Decimal 256)
-    const val TYPE_WORTHLESS = 1 shl 9   // 00000010 00000000 (Decimal 512)
-    const val TYPE_ANGER = 1 shl 10      // 00000100 00000000 (Decimal 1024)
-    const val MASK_TYPE = TYPE_DESPAIR or TYPE_WORTHLESS or TYPE_ANGER // 00000111 00000000 (Decimal 1792)
+    const val TYPE_DESPAIR = 1 shl 8
+    const val TYPE_WORTHLESS = 1 shl 9
+    const val TYPE_ANGER = 1 shl 10
+    const val MASK_TYPE = TYPE_DESPAIR or TYPE_WORTHLESS or TYPE_ANGER
 
     // Default configuration: Total surveillance. Intervene on ALL toxicity vectors.
     const val DEFAULT_MASK = MASK_FOCUS or MASK_TYPE
 
     // --- SEVERITY ARCHITECTURE ---
-    // Severity scores ($S_s$) are probabilistic ranges [0.0 - 1.0].
 
     // MILD severity (0.00 - 0.39): Represented by the icon's harsh golden rays.
     const val SEVERITY_MILD_THRESHOLD = 0.0f
@@ -62,9 +62,9 @@ object SpiralConfig {
      */
     fun toggleFlag(currentMask: Int, flag: Int): Int {
         return if (isEnabled(currentMask, flag)) {
-            currentMask and flag.inv() // Turn off surveillance via bitwise NOT.
+            currentMask and flag.inv()
         } else {
-            currentMask or flag // Turn on surveillance via bitwise OR.
+            currentMask or flag
         }
     }
 }

@@ -31,6 +31,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.tensorflow.lite.task.text.nlclassifier.NLClassifier
+import java.io.File
 
 /**
  * The fortified Observer.
@@ -39,8 +40,8 @@ import org.tensorflow.lite.task.text.nlclassifier.NLClassifier
  * Recursive node excavation implemented.
  * IPC traffic jam resolved via temporal debouncing (400ms).
  * ACTIVE INTERVENTION PROTOCOL (Text Replacement) INITIATED.
- * CUSTOM LEXICON SUPPORT ADDED.
  * PASSIVE AFFIRMATION LOOP INITIATED.
+ * CUSTOM TRIGGERS MIGRATED TO TXT FILE.
  */
 class SpiralObserverService : AccessibilityService() {
 
@@ -63,7 +64,7 @@ class SpiralObserverService : AccessibilityService() {
     private var touchTargetView: View? = null
     private var suggestionsPopupView: View? = null
 
-    // --- NEW: Affirmation Tracking State ---
+    // Affirmation Tracking State
     private var currentPackageName: CharSequence? = null
     private var ignoreCount = 0
     private var affirmationJob: Job? = null
@@ -142,7 +143,6 @@ class SpiralObserverService : AccessibilityService() {
         if (eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED &&
             eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
 
-        // --- NEW: Track the active app to reset the Affirmation loop if you switch apps ---
         val packageName = event.packageName
         if (packageName != null && packageName != currentPackageName) {
             currentPackageName = packageName
@@ -163,8 +163,10 @@ class SpiralObserverService : AccessibilityService() {
 
         val prefs = getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE)
         val activeMask = prefs.getInt(Config.KEY_FILTER_MASK, Config.DEFAULT_MASK)
-        val sensitivity = prefs.getFloat(Config.KEY_SENSITIVITY, Config.DEFAULT_SENSITIVITY)
-        val customPhrases = prefs.getStringSet(Config.KEY_CUSTOM_PHRASES, emptySet()) ?: emptySet()
+
+        // --- NEW: Read Custom Triggers directly from the .txt file ---
+        val triggersFile = File(this.filesDir, Config.FILE_CUSTOM_PHRASES)
+        val customPhrases = if (triggersFile.exists()) triggersFile.readLines().filter { it.isNotBlank() } else emptyList()
 
         interrogationJob?.cancel()
         val safeSource = AccessibilityNodeInfo.obtain(source)
@@ -178,12 +180,12 @@ class SpiralObserverService : AccessibilityService() {
                 var detectedColor: Int? = null
                 var targetText = fullText
 
-                // 1. NEURAL NETWORK EVALUATION
+                // 1. NEURAL NETWORK EVALUATION (Using the locked Sweet Spot)
                 classifier?.let { cortex ->
                     val results = cortex.classify(fullText)
                     val despairScore = results.find { it.label.equals("Negative", ignoreCase = true) }?.score ?: 0f
 
-                    if (despairScore >= sensitivity) {
+                    if (despairScore >= Config.THRESHOLD_CORTEX) {
                         val activeFocus = when {
                             Config.isEnabled(activeMask, Config.FOCUS_SELF) -> Config.FOCUS_SELF
                             Config.isEnabled(activeMask, Config.FOCUS_OTHERS) -> Config.FOCUS_OTHERS
@@ -221,7 +223,7 @@ class SpiralObserverService : AccessibilityService() {
                     }
                 }
 
-                // 3. CUSTOM LEXICON EVALUATION
+                // 3. CUSTOM TXT LEXICON EVALUATION
                 if (!interventionTriggered && customPhrases.isNotEmpty()) {
                     for (phrase in customPhrases) {
                         if (fullText.contains(phrase, ignoreCase = true)) {
@@ -395,7 +397,6 @@ class SpiralObserverService : AccessibilityService() {
             text = "IGNORE"
             setTextColor(AndroidColor.GRAY)
             setBackgroundColor(AndroidColor.TRANSPARENT)
-            // --- NEW: Triggers the Ignore handler instead of just clearing ---
             setOnClickListener { handleIgnore() }
         })
 
@@ -439,18 +440,16 @@ class SpiralObserverService : AccessibilityService() {
             node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
         }
 
-        // --- NEW: Reward the user by resetting the Affirmation loop ---
         resetAffirmationState()
         clearCachedIntervention()
     }
 
-    // --- NEW: Affirmation Logic ---
+    // --- Affirmation Logic ---
 
     private fun handleIgnore() {
         ignoreCount++
         clearCachedIntervention()
 
-        // If they have ignored the machine 2 times, start the support loop
         if (ignoreCount >= 2 && (affirmationJob == null || affirmationJob?.isActive != true)) {
             startAffirmationLoop()
         }
@@ -459,7 +458,6 @@ class SpiralObserverService : AccessibilityService() {
     private fun startAffirmationLoop() {
         affirmationJob = serviceScope.launch(Dispatchers.Main) {
             while (true) {
-                // Wait 20 seconds between gentle reminders
                 delay(20000)
                 Toast.makeText(this@SpiralObserverService, affirmations.random(), Toast.LENGTH_SHORT).show()
             }
