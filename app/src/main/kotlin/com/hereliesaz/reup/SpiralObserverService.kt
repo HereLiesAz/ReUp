@@ -28,6 +28,8 @@ import org.tensorflow.lite.task.text.nlclassifier.NLClassifier
  * The fortified Observer.
  * Main thread exhalation achieved. Semantic coordinates acquired.
  * Rendering pipeline unclogged.
+ * Cartesian disconnect resolved via geometric relativity.
+ * Now tracking the shifting sands of motion with a surgical 4f stroke.
  */
 class SpiralObserverService : AccessibilityService() {
 
@@ -39,6 +41,11 @@ class SpiralObserverService : AccessibilityService() {
     
     // The machine's actual cortex
     private var classifier: NLClassifier? = null
+
+    // Spatial Memory
+    private var cachedTargetNode: AccessibilityNodeInfo? = null
+    private var cachedTargetText: String = ""
+    private var cachedColor: Int? = null
 
     // Fallback/Override lexicon for high-certainty specific vectors
     private val spiralLexicon = mapOf(
@@ -85,8 +92,25 @@ class SpiralObserverService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
 
-        if (event.eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED &&
-            event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val eventType = event.eventType
+
+        // Fast-path for spatial tracking. Do not awaken the neural network just because the user scrolled.
+        if (eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED || 
+            eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+            
+            cachedTargetNode?.let { node ->
+                if (node.refresh()) {
+                    updateVisualIntervention(node, cachedTargetText, cachedColor!!)
+                } else {
+                    clearCachedIntervention()
+                }
+            }
+            event.source?.recycle()
+            return
+        }
+
+        if (eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED &&
+            eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
 
         val source = event.source ?: return
         
@@ -95,6 +119,7 @@ class SpiralObserverService : AccessibilityService() {
         val fullText = sourceText.ifBlank { eventText }.trim()
 
         if (fullText.isBlank()) {
+            clearCachedIntervention()
             source.recycle()
             return
         }
@@ -103,13 +128,11 @@ class SpiralObserverService : AccessibilityService() {
         val activeMask = prefs.getInt(Config.KEY_FILTER_MASK, Config.DEFAULT_MASK)
         val sensitivity = prefs.getFloat(Config.KEY_SENSITIVITY, Config.DEFAULT_SENSITIVITY)
 
-        // Exile to the void. The main thread must not suffer the burden of inference.
         serviceScope.launch {
             var interventionTriggered = false
             var detectedColor: Int? = null
-            var targetText = fullText // Default to the entire block if precise targeting fails
+            var targetText = fullText 
 
-            // Phase 1: Neural Interrogation
             classifier?.let { cortex ->
                 val results = cortex.classify(fullText)
                 val despairScore = results.find { it.label.equals("Negative", ignoreCase = true) }?.score ?: 0f
@@ -123,7 +146,6 @@ class SpiralObserverService : AccessibilityService() {
                 }
             }
 
-            // Phase 2: Lexicon Verification
             if (!interventionTriggered) {
                 for ((trigger, vectors) in spiralLexicon) {
                     if (fullText.contains(trigger)) {
@@ -139,52 +161,71 @@ class SpiralObserverService : AccessibilityService() {
                 }
             }
 
-            // Phase 3: Visual Intervention
             withContext(Dispatchers.Main) {
-                try {
-                    if (interventionTriggered && detectedColor != null) {
-                        val bounds = Rect()
-                        var precisionAchieved = false
-
-                        val startIndex = fullText.indexOf(targetText)
-                        if (startIndex >= 0 && targetText.isNotEmpty()) {
-                            val args = Bundle().apply {
-                                putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_START_INDEX, startIndex)
-                                putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_LENGTH, targetText.length)
-                            }
-                            
-                            val success = source.refreshWithExtraData(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY, args)
-                            
-                            if (success && source.extras != null) {
-                                val parcelables = source.extras.getParcelableArray(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY)
-                                if (parcelables != null && parcelables.isNotEmpty()) {
-                                    val rectFs = parcelables.filterIsInstance<android.graphics.RectF>()
-                                    if (rectFs.isNotEmpty()) {
-                                        val combinedRect = android.graphics.RectF(rectFs.first())
-                                        for (i in 1 until rectFs.size) {
-                                            combinedRect.union(rectFs[i])
-                                        }
-                                        combinedRect.roundOut(bounds)
-                                        precisionAchieved = true
-                                    }
-                                }
-                            }
-                        }
-
-                        // The Fallback: Punish the entire paragraph if the coordinates elude us.
-                        if (!precisionAchieved) {
-                            source.getBoundsInScreen(bounds)
-                        }
-                        
-                        overlayView?.highlightText(bounds, detectedColor!!)
-                    } else {
-                        overlayView?.clearInterference()
-                    }
-                } finally {
+                if (interventionTriggered && detectedColor != null) {
+                    clearCachedIntervention()
+                    
+                    // Cache the source node instead of recycling it. The machine needs it to track motion.
+                    cachedTargetNode = source
+                    cachedTargetText = targetText
+                    cachedColor = detectedColor
+                    
+                    updateVisualIntervention(source, targetText, detectedColor!!)
+                } else {
+                    clearCachedIntervention()
                     source.recycle()
                 }
             }
         }
+    }
+
+    private fun updateVisualIntervention(node: AccessibilityNodeInfo, targetText: String, color: Int) {
+        val bounds = Rect()
+        var precisionAchieved = false
+
+        val nodeText = node.text?.toString()?.lowercase() ?: ""
+        val startIndex = nodeText.indexOf(targetText)
+        if (startIndex >= 0 && targetText.isNotEmpty()) {
+            val args = Bundle().apply {
+                putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_START_INDEX, startIndex)
+                putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_LENGTH, targetText.length)
+            }
+            
+            val success = node.refreshWithExtraData(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY, args)
+            
+            if (success && node.extras != null) {
+                val parcelables = node.extras.getParcelableArray(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY)
+                if (parcelables != null && parcelables.isNotEmpty()) {
+                    val rectFs = parcelables.filterIsInstance<android.graphics.RectF>()
+                    if (rectFs.isNotEmpty()) {
+                        val combinedRect = android.graphics.RectF(rectFs.first())
+                        for (i in 1 until rectFs.size) {
+                            combinedRect.union(rectFs[i])
+                        }
+                        combinedRect.roundOut(bounds)
+                        precisionAchieved = true
+                    }
+                }
+            }
+        }
+
+        if (!precisionAchieved) {
+            node.getBoundsInScreen(bounds)
+        }
+        
+        if (bounds.isEmpty) {
+            overlayView?.clearInterference()
+        } else {
+            overlayView?.highlightText(bounds, color)
+        }
+    }
+
+    private fun clearCachedIntervention() {
+        cachedTargetNode?.recycle()
+        cachedTargetNode = null
+        cachedTargetText = ""
+        cachedColor = null
+        overlayView?.clearInterference()
     }
 
     private fun calculateColorForSeverity(severity: Float): Int {
@@ -193,15 +234,15 @@ class SpiralObserverService : AccessibilityService() {
             severity >= Config.SEVERITY_MODERATE_THRESHOLD -> Config.SEVERITY_MODERATE_COLOR
             else -> Config.SEVERITY_MILD_COLOR
         }
-        // CRITICAL FIX: Compose Color translated to Android ARGB Int
         return baseColor.copy(alpha = 0.8f).toArgb()
     }
 
-    override fun onInterrupt() { overlayView?.clearInterference() }
+    override fun onInterrupt() { clearCachedIntervention() }
 
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
+        clearCachedIntervention()
         overlayView?.let { windowManager?.removeView(it) }
         dbHelper.close()
     }
@@ -209,13 +250,12 @@ class SpiralObserverService : AccessibilityService() {
     private inner class HighlightView(context: Context) : View(context) {
         
         init {
-            // Force the Android pipeline to acknowledge this view intends to draw.
             setWillNotDraw(false)
         }
         
         private val paint = Paint().apply {
             style = Paint.Style.STROKE
-            strokeWidth = 12f
+            strokeWidth = 4f // The requested razor
             isAntiAlias = true
         }
         private var targetBounds: Rect? = null
@@ -223,7 +263,14 @@ class SpiralObserverService : AccessibilityService() {
 
         fun highlightText(bounds: Rect, color: Int) {
             isInterfering = true
-            targetBounds = Rect(bounds)
+            
+            val screenOffset = IntArray(2)
+            getLocationOnScreen(screenOffset)
+            
+            targetBounds = Rect(bounds).apply {
+                offset(-screenOffset[0], -screenOffset[1])
+            }
+            
             paint.color = color
             invalidate()
         }
