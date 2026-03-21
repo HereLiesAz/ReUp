@@ -90,7 +90,14 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
     
-    implementation("org.tensorflow:tensorflow-lite-task-text:0.4.4")
+    implementation("org.tensorflow:tensorflow-lite-task-text:0.4.4") {
+        exclude(group = "org.tensorflow", module = "tensorflow-lite")
+        exclude(group = "org.tensorflow", module = "tensorflow-lite-api")
+    }
+    
+    // Core TFLite runtime and API needed for task classification to function and for R8 to find annotations
+    implementation("org.tensorflow:tensorflow-lite:2.17.0")
+    implementation("org.tensorflow:tensorflow-lite-api:2.17.0")
     
     implementation("com.google.auto.value:auto-value-annotations:1.11.1")
 }
