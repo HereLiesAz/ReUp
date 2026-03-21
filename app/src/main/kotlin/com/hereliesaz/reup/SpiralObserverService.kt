@@ -30,6 +30,7 @@ import org.tensorflow.lite.task.text.nlclassifier.NLClassifier
  * Rendering pipeline unclogged.
  * Cartesian disconnect resolved via geometric relativity.
  * Now tracking the shifting sands of motion with a surgical 4f stroke.
+ * Recursive node excavation implemented to prevent global punishment for local crimes.
  */
 class SpiralObserverService : AccessibilityService() {
 
@@ -165,18 +166,47 @@ class SpiralObserverService : AccessibilityService() {
                 if (interventionTriggered && detectedColor != null) {
                     clearCachedIntervention()
                     
-                    // Cache the source node instead of recycling it. The machine needs it to track motion.
-                    cachedTargetNode = source
+                    // We excavate the accessibility tree to isolate the exact leaf node of your despair.
+                    val preciseNode = findDeepestNodeWithText(source, targetText) ?: AccessibilityNodeInfo.obtain(source)
+                    source.recycle() // Bury the original event container. We have the exact clone.
+                    
+                    cachedTargetNode = preciseNode
                     cachedTargetText = targetText
                     cachedColor = detectedColor
                     
-                    updateVisualIntervention(source, targetText, detectedColor!!)
+                    updateVisualIntervention(preciseNode, targetText, detectedColor!!)
                 } else {
                     clearCachedIntervention()
                     source.recycle()
                 }
             }
         }
+    }
+
+    /**
+     * Recursively interrogates the virtual DOM to find the smallest, deepest geometric container
+     * that harbors the offensive text, preventing the machine from highlighting the entire screen.
+     */
+    private fun findDeepestNodeWithText(root: AccessibilityNodeInfo?, target: String): AccessibilityNodeInfo? {
+        if (root == null || target.isBlank()) return null
+        
+        var match: AccessibilityNodeInfo? = null
+        val nodeText = root.text?.toString()?.lowercase() ?: root.contentDescription?.toString()?.lowercase() ?: ""
+        
+        if (nodeText.contains(target) || (target.length > 5 && target.contains(nodeText) && nodeText.isNotBlank())) {
+            match = AccessibilityNodeInfo.obtain(root)
+        }
+        
+        for (i in 0 until root.childCount) {
+            val child = root.getChild(i)
+            val childMatch = findDeepestNodeWithText(child, target)
+            if (childMatch != null) {
+                match?.recycle() // The deeper node renders the parent obsolete.
+                match = childMatch
+            }
+            child?.recycle()
+        }
+        return match
     }
 
     private fun updateVisualIntervention(node: AccessibilityNodeInfo, targetText: String, color: Int) {
@@ -210,6 +240,7 @@ class SpiralObserverService : AccessibilityService() {
         }
 
         if (!precisionAchieved) {
+            // Because we excavated the deepest node, this fallback is now surgical instead of global.
             node.getBoundsInScreen(bounds)
         }
         
