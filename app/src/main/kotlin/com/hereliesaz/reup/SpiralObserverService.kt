@@ -151,6 +151,12 @@ class SpiralObserverService : AccessibilityService() {
 
         val source = event.source ?: return
 
+        if (!source.isEditable) {
+            clearCachedIntervention()
+            source.recycle()
+            return
+        }
+
         val eventText = event.text.joinToString(" ").lowercase()
         val sourceText = source.text?.toString()?.lowercase() ?: ""
         val fullText = sourceText.ifBlank { eventText }.trim()
@@ -174,7 +180,7 @@ class SpiralObserverService : AccessibilityService() {
 
         interrogationJob = serviceScope.launch {
             try {
-                delay(400) // Debounce breath
+                delay(1000) // Debounce breath
 
                 var interventionTriggered = false
                 var detectedColor: Int? = null
