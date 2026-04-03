@@ -152,7 +152,6 @@ class SpiralObserverService : AccessibilityService() {
         val source = event.source ?: return
 
         if (!source.isEditable) {
-            clearCachedIntervention()
             source.recycle()
             return
         }
