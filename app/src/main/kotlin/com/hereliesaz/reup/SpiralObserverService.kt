@@ -233,12 +233,21 @@ class SpiralObserverService : AccessibilityService() {
                     for (phrase in customPhrases) {
                         if (fullText.contains(phrase, ignoreCase = true)) {
                             interventionTriggered = true
-                            targetText = phrase
+                            targetText = phrase.lowercase()
                             dbHelper.logDistortion(phrase, Config.FOCUS_SELF, Config.TYPE_DESPAIR)
                             detectedColor = calculateColorForSeverity(0.6f)
                             break
                         }
                     }
+                }
+
+                // 4. PERSISTENT INTERVENTION FALLBACK
+                if (!interventionTriggered && cachedTargetText.isNotEmpty() && fullText.contains(cachedTargetText, ignoreCase = true)) {
+                    interventionTriggered = true
+                    targetText = cachedTargetText.lowercase()
+                    detectedColor = cachedColor
+                    // Intentionally NOT logging this via dbHelper.logDistortion
+                    // to prevent duplicate logs for the same active intervention.
                 }
 
                 withContext(Dispatchers.Main) {
@@ -298,6 +307,7 @@ class SpiralObserverService : AccessibilityService() {
 
         val nodeText = node.text?.toString()?.lowercase() ?: ""
         val startIndex = nodeText.indexOf(targetText)
+
         if (startIndex >= 0 && targetText.isNotEmpty()) {
             val args = Bundle().apply {
                 putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_START_INDEX, startIndex)
