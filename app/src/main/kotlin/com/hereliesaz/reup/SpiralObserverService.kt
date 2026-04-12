@@ -242,9 +242,9 @@ class SpiralObserverService : AccessibilityService() {
                 }
 
                 // 4. PERSISTENT INTERVENTION FALLBACK
-                if (!interventionTriggered && cachedTargetText.isNotEmpty() && fullText.contains(cachedTargetText, ignoreCase = true)) {
+                if (!interventionTriggered && cachedTargetText.isNotEmpty() && fullText.contains(cachedTargetText)) {
                     interventionTriggered = true
-                    targetText = cachedTargetText.lowercase()
+                    targetText = cachedTargetText
                     detectedColor = cachedColor
                     // Intentionally NOT logging this via dbHelper.logDistortion
                     // to prevent duplicate logs for the same active intervention.
