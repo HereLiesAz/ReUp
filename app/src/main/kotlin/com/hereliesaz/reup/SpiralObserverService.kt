@@ -233,7 +233,7 @@ class SpiralObserverService : AccessibilityService() {
                     for (phrase in customPhrases) {
                         if (fullText.contains(phrase, ignoreCase = true)) {
                             interventionTriggered = true
-                            targetText = phrase.lowercase()
+                            targetText = phrase
                             dbHelper.logDistortion(phrase, Config.FOCUS_SELF, Config.TYPE_DESPAIR)
                             detectedColor = calculateColorForSeverity(0.6f)
                             break
@@ -242,7 +242,7 @@ class SpiralObserverService : AccessibilityService() {
                 }
 
                 // 4. PERSISTENT INTERVENTION FALLBACK
-                if (!interventionTriggered && cachedTargetText.isNotEmpty() && fullText.contains(cachedTargetText)) {
+                if (!interventionTriggered && cachedTargetText.isNotEmpty() && fullText.contains(cachedTargetText, ignoreCase = true)) {
                     interventionTriggered = true
                     targetText = cachedTargetText
                     detectedColor = cachedColor
@@ -285,8 +285,9 @@ class SpiralObserverService : AccessibilityService() {
         if (root == null || target.isBlank()) return null
         var match: AccessibilityNodeInfo? = null
         val nodeText = root.text?.toString()?.lowercase() ?: root.contentDescription?.toString()?.lowercase() ?: ""
+        val searchTarget = target.lowercase()
 
-        if (nodeText.contains(target) || (target.length > 5 && target.contains(nodeText) && nodeText.isNotBlank())) {
+        if (nodeText.contains(searchTarget) || (searchTarget.length > 5 && searchTarget.contains(nodeText) && nodeText.isNotBlank())) {
             match = AccessibilityNodeInfo.obtain(root)
         }
         for (i in 0 until root.childCount) {
@@ -306,9 +307,10 @@ class SpiralObserverService : AccessibilityService() {
         var precisionAchieved = false
 
         val nodeText = node.text?.toString()?.lowercase() ?: ""
-        val startIndex = nodeText.indexOf(targetText)
+        val searchTarget = targetText.lowercase()
+        val startIndex = nodeText.indexOf(searchTarget)
 
-        if (startIndex < 0 || targetText.isEmpty()) {
+        if (startIndex < 0 || searchTarget.isEmpty()) {
             clearCachedIntervention()
             return
         }
