@@ -308,26 +308,29 @@ class SpiralObserverService : AccessibilityService() {
         val nodeText = node.text?.toString()?.lowercase() ?: ""
         val startIndex = nodeText.indexOf(targetText)
 
-        if (startIndex >= 0 && targetText.isNotEmpty()) {
-            val args = Bundle().apply {
-                putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_START_INDEX, startIndex)
-                putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_LENGTH, targetText.length)
-            }
+        if (startIndex < 0 || targetText.isEmpty()) {
+            clearCachedIntervention()
+            return
+        }
 
-            val success = node.refreshWithExtraData(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY, args)
+        val args = Bundle().apply {
+            putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_START_INDEX, startIndex)
+            putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_LENGTH, targetText.length)
+        }
 
-            if (success && node.extras != null) {
-                val parcelables = node.extras.getParcelableArray(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY)
-                if (parcelables != null && parcelables.isNotEmpty()) {
-                    val rectFs = parcelables.filterIsInstance<android.graphics.RectF>()
-                    if (rectFs.isNotEmpty()) {
-                        val combinedRect = android.graphics.RectF(rectFs.first())
-                        for (i in 1 until rectFs.size) {
-                            combinedRect.union(rectFs[i])
-                        }
-                        combinedRect.roundOut(bounds)
-                        precisionAchieved = true
+        val success = node.refreshWithExtraData(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY, args)
+
+        if (success && node.extras != null) {
+            val parcelables = node.extras.getParcelableArray(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY)
+            if (parcelables != null && parcelables.isNotEmpty()) {
+                val rectFs = parcelables.filterIsInstance<android.graphics.RectF>()
+                if (rectFs.isNotEmpty()) {
+                    val combinedRect = android.graphics.RectF(rectFs.first())
+                    for (i in 1 until rectFs.size) {
+                        combinedRect.union(rectFs[i])
                     }
+                    combinedRect.roundOut(bounds)
+                    precisionAchieved = true
                 }
             }
         }
