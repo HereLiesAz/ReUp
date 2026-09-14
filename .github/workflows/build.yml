@@ -1,77 +1,25 @@
-name: The Assembly Line of Despair
-
+# centralized-by: HereLiesAz/workflows
+# central-source-path: .github/workflows/build.yml
+# central-source-sha256: e6dc8ef902c25e4c1b5dfcc338526e617afb9e104fb1cadbaac740ab7b259d3e
+# This file intentionally contains no repository secrets.
+name: The Assembly Line of Despair [central proxy]
 on:
   push:
-    branches: [ "main" ]
-
+    branches: ["main"]
+permissions:
+  contents: read
+  id-token: write
 jobs:
-  build-and-publish:
+  central-dispatch:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
     steps:
-      - name: Checkout the Void
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Establish Epistemology
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Gradle Bureaucracy
-        uses: gradle/actions/setup-gradle@v6
-
-      - name: Calculate Entropy (a.b.c.d)
-        id: version
-        run: |
-          source version.properties
-          a=$MAJOR
-          b=$MINOR
-          
-          d=${{ github.run_number }}
-          
-          TAG_NAME="v$a.$b"
-          
-          if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
-            git fetch --tags
-            c=$(git rev-list ${TAG_NAME}..HEAD --count)
-          else
-            c=0
-          fi
-          
-          VERSION_NAME="$a.$b.$c.$d"
-          
-          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
-          echo "VERSION_CODE=$d" >> $GITHUB_ENV
-          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
-          echo "REVISION_C=$c" >> $GITHUB_ENV
-          
-          # Generate Changelog since the last tag (if exists)
-          LAST_TAG=$(git tag --sort=-v:refname | grep -v "$TAG_NAME" | head -n 1 || echo "")
-          if [ -n "$LAST_TAG" ]; then
-            echo "Generating changelog between $LAST_TAG and HEAD"
-            echo "### Changelog (since $LAST_TAG)" > changelog.md
-            git log ${LAST_TAG}..HEAD --oneline --pretty=format:"* %s (%h)" >> changelog.md
-          else
-            echo "Generating initial changelog"
-            echo "### Initial Build" > changelog.md
-            git log --oneline --pretty=format:"* %s (%h)" >> changelog.md
-          fi
-          
-          echo "Calculated Vector: $VERSION_NAME"
-
-      - name: Compile the Panopticon
-        run: ./gradlew assembleDebug
-
-      - name: Publish the Evidence
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.TAG_NAME }}
-          name: "ReUp ${{ env.TAG_NAME }}"
-          prerelease: true
-          files: app/build/outputs/apk/debug/*.apk
-          body_path: changelog.md
+      - name: Dispatch to HereLiesAz/workflows
+        env:
+          WORKFLOWS_GATEWAY_URL: ${{ vars.WORKFLOWS_GATEWAY_URL }}
+          EVENT_JSON: ${{ toJSON(github.event) }}
+          INPUTS_JSON: ${{ toJSON(inputs) }}
+          VARS_JSON: ${{ toJSON(vars) }}
+          SOURCE_WORKFLOW_PATH: .github/workflows/build.yml
+          SOURCE_SHA256: e6dc8ef902c25e4c1b5dfcc338526e617afb9e104fb1cadbaac740ab7b259d3e
+        shell: bash
+        run: "set -euo pipefail\n[[ -n \"${WORKFLOWS_GATEWAY_URL:-}\" ]] || { echo \"Repository variable WORKFLOWS_GATEWAY_URL is not configured.\" >&2; exit 1; }\noidc_response=\"$(curl --fail-with-body --silent --show-error -H \"Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}\" \"${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hereliesaz-workflows\")\"\noidc_token=\"$(jq -r '.value // empty' <<<\"$oidc_response\")\"\n[[ -n \"$oidc_token\" ]] || { echo \"GitHub did not issue an OIDC token.\" >&2; exit 1; }\necho \"::add-mask::$oidc_token\"\npayload=\"$(jq -n   --arg repository \"$GITHUB_REPOSITORY\" --arg repository_id \"$GITHUB_REPOSITORY_ID\"   --arg repository_owner \"$GITHUB_REPOSITORY_OWNER\" --arg repository_owner_id \"$GITHUB_REPOSITORY_OWNER_ID\"   --arg sha \"$GITHUB_SHA\" --arg ref \"$GITHUB_REF\" --arg ref_name \"$GITHUB_REF_NAME\" --arg ref_type \"$GITHUB_REF_TYPE\"   --arg head_ref \"$GITHUB_HEAD_REF\" --arg base_ref \"$GITHUB_BASE_REF\" --arg actor \"$GITHUB_ACTOR\" --arg actor_id \"$GITHUB_ACTOR_ID\"   --arg event_name \"$GITHUB_EVENT_NAME\" --arg run_id \"$GITHUB_RUN_ID\" --arg run_number \"$GITHUB_RUN_NUMBER\" --arg run_attempt \"$GITHUB_RUN_ATTEMPT\"   --arg workflow_ref \"$GITHUB_WORKFLOW_REF\" --arg workflow_name \"$GITHUB_WORKFLOW\" --arg source_workflow_path \"$SOURCE_WORKFLOW_PATH\"   --arg source_sha256 \"$SOURCE_SHA256\" --argjson event \"$EVENT_JSON\" --argjson inputs \"$INPUTS_JSON\" --argjson vars \"$VARS_JSON\"   '{repository:$repository,repository_id:$repository_id,repository_owner:$repository_owner,repository_owner_id:$repository_owner_id,sha:$sha,check_sha:($event.pull_request.head.sha // $sha),ref:$ref,ref_name:$ref_name,ref_type:$ref_type,head_ref:$head_ref,base_ref:$base_ref,actor:$actor,actor_id:$actor_id,event_name:$event_name,event:$event,inputs:$inputs,vars:$vars,run_id:$run_id,run_number:$run_number,run_attempt:$run_attempt,workflow_ref:$workflow_ref,workflow_name:$workflow_name,source_workflow_path:$source_workflow_path,source_sha256:$source_sha256}')\"\ncurl --fail-with-body --silent --show-error -X POST \"${WORKFLOWS_GATEWAY_URL%/}/dispatch\" -H \"Authorization: Bearer ${oidc_token}\" -H \"Content-Type: application/json\" --data-binary \"$payload\""
