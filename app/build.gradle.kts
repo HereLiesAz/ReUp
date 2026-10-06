@@ -16,11 +16,16 @@ val versionProps = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 
-// Prioritizing the CI's "Assembly Line" environment variables
-val envVersionName = System.getenv("VERSION_NAME") 
-    ?: "${versionProps.getProperty("MAJOR", "0")}.${versionProps.getProperty("MINOR", "0")}.0"
-val envVersionCode = System.getenv("VERSION_CODE")?.toInt() 
-    ?: ((versionProps.getProperty("MAJOR", "0").toInt() * 100) + versionProps.getProperty("MINOR", "0").toInt())
+// Prioritizing the central release executors (HereLiesAz/workflows android-play-release /
+// android-github-release): Play passes -PversionCodeOverride/-PversionName; both rewrite
+// version.properties (versionMajor/Minor/Patch/Build). Local builds fall back to the file.
+fun versionPart(key: String) = versionProps.getProperty(key)?.trim()?.toIntOrNull() ?: 0
+val envVersionName = (findProperty("versionNameOverride") ?: findProperty("versionName"))?.toString()
+    ?: "${versionPart("versionMajor")}.${versionPart("versionMinor")}.${versionPart("versionPatch")}.${versionPart("versionBuild")}"
+val envVersionCode = (findProperty("versionCodeOverride")?.toString()?.toIntOrNull())
+    ?: System.getenv("ANDROID_VERSION_CODE")?.toIntOrNull()
+    ?: (versionPart("versionMajor") * 1_000_000 + versionPart("versionMinor") * 10_000 +
+        versionPart("versionPatch") * 100 + versionPart("versionBuild"))
 
 android {
     namespace = "com.hereliesaz.reup"
