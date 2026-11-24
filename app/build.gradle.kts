@@ -27,7 +27,15 @@ val envVersionCode = (findProperty("versionCodeOverride")?.toString()?.toIntOrNu
     ?: (versionPart("versionMajor") * 1_000_000 + versionPart("versionMinor") * 10_000 +
         versionPart("versionPatch") * 100 + versionPart("versionBuild"))
 
+// The central Play release passes releaseVersionCode; GitHub builds omit the Play SDK.
+val playUpdates = providers.gradleProperty("azPlayUpdates").map { it.toBooleanStrict() }
+    .orElse(providers.gradleProperty("releaseVersionCode").map { true }).orElse(false)
+
 android {
+    sourceSets.getByName("main").kotlin.srcDir(
+        if (playUpdates.get()) "src/playUpdates/kotlin" else "src/githubUpdates/kotlin"
+    )
+
     namespace = "com.hereliesaz.reup"
     compileSdk = 36
 
@@ -87,6 +95,8 @@ tasks.register("downloadCortex") {
 tasks.named("preBuild") { dependsOn("downloadCortex") }
 
 dependencies {
+    implementation("com.github.HereLiesAz.AzNavRail:aznavrail-updates:12.5")
+    if (playUpdates.get()) implementation("com.github.HereLiesAz.AzNavRail:aznavrail-updates-play:12.5")
     implementation("androidx.core:core-ktx:1.18.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
     implementation("androidx.activity:activity-compose:1.13.0")
