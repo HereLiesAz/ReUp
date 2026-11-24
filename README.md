@@ -31,4 +31,6 @@ The operating system considers this application fundamentally hostile. It requir
 
 ## Privacy Note
 
-ReUp processes all text and neural network inference locally on the device. The machine is isolated. The accessibility service does not transmit your breakdowns to external servers. The SQLite database is securely sandboxed.
+ReUp processes all text and neural network inference locally on the device. The accessibility and inference pipeline is isolated. The accessibility service does not transmit your breakdowns to external servers. The SQLite database is securely sandboxed.
+
+Android release builds check official GitHub release metadata or Google Play update availability through AzNavRail 12.5. No observed text, accessibility events or classification data is sent by the checker.
